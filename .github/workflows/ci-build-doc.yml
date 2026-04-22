@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+      - name: Install kicad_pedal_common
+        run: pip install -e kicad_pedal_common
       - name: Install dependencies
         run: |
           cd build-doc-plugin
@@ -35,5 +37,3 @@ jobs:
         run: |
           cd build-doc-plugin
           pytest tests/ -v
-        env:
-          PYTHONPATH: ${{ github.workspace }}

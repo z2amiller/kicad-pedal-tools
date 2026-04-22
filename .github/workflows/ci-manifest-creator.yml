@@ -19,12 +19,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+      - name: Install kicad_pedal_common
+        run: pip install -e kicad_pedal_common
       - name: Install dev dependencies
         run: |
           cd manifest-creator
           pip install -e ".[dev]"
-        env:
-          PYTHONPATH: ${{ github.workspace }}
       - name: Lint
         run: |
           cd manifest-creator
@@ -37,5 +37,3 @@ jobs:
         run: |
           cd manifest-creator
           pytest tests/ -v
-        env:
-          PYTHONPATH: ${{ github.workspace }}

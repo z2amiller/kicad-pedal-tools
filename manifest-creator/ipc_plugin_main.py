@@ -83,8 +83,8 @@ def main() -> int:
 
 def _run(board, kicad) -> int:
     import threading
-    import wx
 
+    import wx
     from kicad_pedal_common.plugin_utils import get_board_path
 
     board_path = get_board_path(board)
