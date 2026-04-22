@@ -39,8 +39,8 @@ for file in "$REPO_ROOT"/*.py "$REPO_ROOT"/*.txt \
     cp -f "$file" "$PLUGINS_DIR/"
 done
 
-echo "Copy kicad_pedal_common from monorepo root"
-cp -rf "$MONOREPO_ROOT/kicad_pedal_common" "$PLUGINS_DIR/"
+echo "Copy kicad_pedal_common package from monorepo root"
+cp -rf "$MONOREPO_ROOT/kicad_pedal_common/kicad_pedal_common" "$PLUGINS_DIR/"
 
 echo "Copy icon to resources/ (PCM Plugin Manager) and plugins/ (IPC toolbar)"
 cp -f "$REPO_ROOT/icon.png" "$RESOURCES_DIR/"

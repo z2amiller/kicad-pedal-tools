@@ -42,8 +42,8 @@ done
 echo "Copy manifest_creator package"
 cp -rf "$REPO_ROOT/manifest_creator" "$PLUGINS_DIR/"
 
-echo "Copy kicad_pedal_common from monorepo root"
-cp -rf "$MONOREPO_ROOT/kicad_pedal_common" "$PLUGINS_DIR/"
+echo "Copy kicad_pedal_common package from monorepo root"
+cp -rf "$MONOREPO_ROOT/kicad_pedal_common/kicad_pedal_common" "$PLUGINS_DIR/"
 
 echo "Copy icon to resources/ (PCM Plugin Manager) and plugins/ (IPC toolbar)"
 cp -f "$REPO_ROOT/icon.png" "$RESOURCES_DIR/"
