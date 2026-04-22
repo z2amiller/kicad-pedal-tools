@@ -86,7 +86,10 @@ class DrillEditorDialog(wx.Dialog):
         )
         self.board = board
         self.plugin_dir = plugin_dir
-        self._board_path = get_board_path(board)
+        from kicad_pedal_common.board_adapter import KipyBoardAdapter
+
+        self._adapter = KipyBoardAdapter(board)
+        self._board_path = get_board_path(self._adapter)
         self._project_dir = os.path.dirname(self._board_path) if self._board_path else ""
         self._project_json = (
             os.path.join(self._project_dir, "panel_config.json") if self._project_dir else ""
@@ -385,7 +388,7 @@ class DrillEditorDialog(wx.Dialog):
         from enclosure_template import get_footprint_entries
 
         full = load_panel_config(self._board_path or "", self.plugin_dir)
-        raw = get_footprint_entries(self.board, full)
+        raw = get_footprint_entries(self._adapter, full)
         self._fp_entries = []
         self._fp_originals = {}
         for e in raw:
@@ -696,7 +699,7 @@ class DrillEditorDialog(wx.Dialog):
             tf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             tf.close()
             generate_enclosure_pdf(
-                board=self.board,
+                adapter=self._adapter,
                 config=config,
                 project_name=os.path.basename(self._project_dir)
                 if self._project_dir

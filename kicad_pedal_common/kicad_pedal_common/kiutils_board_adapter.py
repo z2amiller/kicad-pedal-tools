@@ -15,7 +15,8 @@ Python 3.9 compatible.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional
+import os
+from typing import Dict, List, Optional, Tuple
 
 from kicad_pedal_common.board_adapter import (
     BoardAdapter,
@@ -32,6 +33,7 @@ class KiutilsBoardAdapter(BoardAdapter):
         from kiutils.board import Board  # deferred so absence of kiutils fails late
 
         _patch_kiutils_kicad10_compat()
+        self._pcb_path = os.path.abspath(pcb_path)
         self._board = Board.from_file(pcb_path)
 
     # ------------------------------------------------------------------
@@ -118,6 +120,53 @@ class KiutilsBoardAdapter(BoardAdapter):
             pass
         return {"w": 5.0, "h": 5.0}
 
+    def get_board_path(self) -> str:
+        return self._pcb_path
+
+    def get_board_bounding_box(self) -> Optional[Tuple[float, float, float, float]]:
+        xs: list = []
+        ys: list = []
+        for item in getattr(self._board, "graphicItems", []) or []:
+            try:
+                layer = getattr(item, "layer", "") or ""
+                if layer != "Edge.Cuts":
+                    continue
+                for attr in ("start", "end"):
+                    pt = getattr(item, attr, None)
+                    if pt is not None:
+                        xs.append(float(pt.X))
+                        ys.append(float(pt.Y))
+                center = getattr(item, "center", None)
+                end = getattr(item, "end", None)
+                if center is not None and end is not None:
+                    r = math.hypot(end.X - center.X, end.Y - center.Y)
+                    xs.extend([center.X - r, center.X + r])
+                    ys.extend([center.Y - r, center.Y + r])
+            except Exception:
+                pass
+        if not xs or not ys:
+            return None
+        return (min(xs), max(xs), min(ys), max(ys))
+
+    def get_pad_centroid_offset(self, fp_data: "FootprintData") -> Tuple[float, float]:
+        fp = fp_data._raw
+        if fp is None:
+            return (0.0, 0.0)
+        try:
+            pads = getattr(fp, "pads", None) or []
+            if not pads:
+                return (0.0, 0.0)
+            cx_local = sum(getattr(p.position, "X", 0.0) for p in pads) / len(pads)
+            cy_local = sum(getattr(p.position, "Y", 0.0) for p in pads) / len(pads)
+            rot_rad = math.radians(fp_data.rotation)
+            cos_r = math.cos(rot_rad)
+            sin_r = math.sin(rot_rad)
+            dx = cx_local * cos_r + cy_local * sin_r
+            dy = -cx_local * sin_r + cy_local * cos_r
+            return (dx, dy)
+        except Exception:
+            return (0.0, 0.0)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -198,6 +247,17 @@ class KiutilsBoardAdapter(BoardAdapter):
 
         description = self._get_description(fp)
 
+        # Custom fields (lowercase keys, excluding Reference/Value)
+        fields: Dict[str, str] = {}
+        try:
+            for k, v in fp.properties.items():  # type: ignore[union-attr]
+                if k.lower() not in ("reference", "value"):
+                    fields[k.lower()] = str(v).strip() if v else ""
+        except Exception:
+            pass
+
+        pad_count = len(getattr(fp, "pads", None) or [])
+
         return FootprintData(
             ref=ref,
             value=value,
@@ -209,6 +269,8 @@ class KiutilsBoardAdapter(BoardAdapter):
             dnp=dnp,
             exclude_from_bom=exclude_from_bom,
             description=description,
+            fields=fields,
+            pad_count=pad_count,
             _raw=fp,
         )
 

@@ -28,7 +28,10 @@ class BulkEditDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
         self.board = board
-        self._rows: list[FootprintRow] = load_footprints(board)
+        from kicad_pedal_common.board_adapter import KipyBoardAdapter
+
+        self._adapter = KipyBoardAdapter(board)
+        self._rows: list[FootprintRow] = load_footprints(self._adapter)
         self._selected_row: Optional[int] = None
         self._updating = False
         self._build_ui()

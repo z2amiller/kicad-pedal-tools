@@ -91,7 +91,7 @@ def _controls_box(title: str, items: list, inner_w: float) -> Table:
 
 
 def build_cover_story(
-    board,
+    adapter,
     project_name: str,
     author: str,
     revision: str,
@@ -166,8 +166,8 @@ def build_cover_story(
         story.append(Spacer(1, 0.1 * inch))
 
     _log("Extracting controls…")
-    config = load_panel_config(get_board_path(board), plugin_dir, _log)
-    controls = extract_controls(board, set(config.footprints.keys()))
+    config = load_panel_config(get_board_path(adapter), plugin_dir, _log)
+    controls = extract_controls(adapter, set(config.footprints.keys()))
     external = controls.external
     internal = controls.internal
     _log(f"  Found {len(external)} external, {len(internal)} internal control(s).")

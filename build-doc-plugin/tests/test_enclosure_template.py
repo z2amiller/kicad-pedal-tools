@@ -1,16 +1,22 @@
-import math
 import os
 import sys
 from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from kipy.board import BoardLayer
+from kicad_pedal_common.board_adapter import FootprintData, KipyBoardAdapter
 
-from enclosure_template import TaydaHole, _EnclosureRenderer, _pad_centroid_offset_mm
+from enclosure_template import TaydaHole, _EnclosureRenderer
 from panel_config import SideBHole
 
 NM = 1_000_000  # nanometres per mm
+
+
+def _make_mock_board():
+    b = MagicMock()
+    b.get_footprints.return_value = []
+    b.get_shapes.return_value = []
+    return b
 
 
 def _make_pad(abs_x_nm, abs_y_nm):
@@ -20,23 +26,36 @@ def _make_pad(abs_x_nm, abs_y_nm):
     return p
 
 
-def _make_fp(fp_x_nm, fp_y_nm, pads, orientation_deg=0.0, layer=BoardLayer.BL_F_Cu):
+def _make_fp_raw(fp_x_nm, fp_y_nm, pads):
     fp = MagicMock()
     fp.position.x = fp_x_nm
     fp.position.y = fp_y_nm
     fp.definition.pads = pads
-    angle = MagicMock()
-    angle.to_radians.return_value = math.radians(orientation_deg)
-    fp.orientation = angle
-    fp.layer = layer
     return fp
+
+
+def _make_fp_data_with_raw(fp_x_nm, fp_y_nm, pads, rotation_deg=0.0, layer="F"):
+    fp_raw = _make_fp_raw(fp_x_nm, fp_y_nm, pads)
+    return FootprintData(
+        ref="U1",
+        value="val",
+        footprint_id="Lib:Part",
+        layer=layer,
+        pos_x=fp_x_nm / NM,
+        pos_y=fp_y_nm / NM,
+        rotation=rotation_deg,
+        dnp=False,
+        exclude_from_bom=False,
+        _raw=fp_raw,
+    )
 
 
 def test_centroid_at_origin_two_pads():
     # Footprint at origin; pad1 at (0,0), pad2 at (2.54mm, 0).
     # Centroid offset = (1.27mm, 0).
-    fp = _make_fp(0, 0, [_make_pad(0, 0), _make_pad(2_540_000, 0)])
-    dx, dy = _pad_centroid_offset_mm(fp)
+    adapter = KipyBoardAdapter(_make_mock_board())
+    fp_data = _make_fp_data_with_raw(0, 0, [_make_pad(0, 0), _make_pad(2_540_000, 0)])
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx - 1.27) < 1e-6
     assert abs(dy) < 1e-6
 
@@ -46,15 +65,13 @@ def test_centroid_with_fp_offset():
     # Pad1 at fp origin, pad2 at fp_x + 2.54mm.
     fp_x = int(108.76 * NM)
     fp_y = int(100.73 * NM)
-    fp = _make_fp(
+    fp_data = _make_fp_data_with_raw(
         fp_x,
         fp_y,
-        [
-            _make_pad(fp_x, fp_y),
-            _make_pad(fp_x + 2_540_000, fp_y),
-        ],
+        [_make_pad(fp_x, fp_y), _make_pad(fp_x + 2_540_000, fp_y)],
     )
-    dx, dy = _pad_centroid_offset_mm(fp)
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx - 1.27) < 1e-6
     assert abs(dy) < 1e-6
 
@@ -63,45 +80,61 @@ def test_centroid_rotated_90():
     # Footprint at origin, rotated 90° CCW. kipy reports pad positions in absolute
     # PCB coordinates, so a local (2.54mm, 0) pad appears at absolute (0, 2.54mm).
     # Centroid offset = (0, 1.27mm) — no orientation math needed on our side.
-    fp = _make_fp(0, 0, [_make_pad(0, 0), _make_pad(0, 2_540_000)], orientation_deg=90.0)
-    dx, dy = _pad_centroid_offset_mm(fp)
+    fp_data = _make_fp_data_with_raw(
+        0, 0, [_make_pad(0, 0), _make_pad(0, 2_540_000)], rotation_deg=90.0
+    )
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx) < 1e-6
     assert abs(dy - 1.27) < 1e-6
 
 
 def test_centroid_b_cu_same_as_f_cu():
     # B.Cu footprints: pad positions are absolute PCB coords just like F.Cu.
-    # No mirroring is applied by _pad_centroid_offset_mm — the caller handles
-    # the enclosure X-mirror separately.
-    fp = _make_fp(
-        0,
-        0,
-        [_make_pad(0, 0), _make_pad(2_540_000, 0)],
-        layer=BoardLayer.BL_B_Cu,
+    fp_data = _make_fp_data_with_raw(
+        0, 0, [_make_pad(0, 0), _make_pad(2_540_000, 0)], layer="B"
     )
-    dx, dy = _pad_centroid_offset_mm(fp)
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx - 1.27) < 1e-6
     assert abs(dy) < 1e-6
 
 
 def test_centroid_symmetric_pads_zero_offset():
     # Pads symmetric around fp origin → centroid = fp origin → offset (0, 0).
-    fp = _make_fp(0, 0, [_make_pad(-1_270_000, 0), _make_pad(1_270_000, 0)], orientation_deg=45.0)
-    dx, dy = _pad_centroid_offset_mm(fp)
+    fp_data = _make_fp_data_with_raw(
+        0, 0, [_make_pad(-1_270_000, 0), _make_pad(1_270_000, 0)], rotation_deg=45.0
+    )
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx) < 1e-6
     assert abs(dy) < 1e-6
 
 
 def test_centroid_no_pads_returns_zero():
-    fp = _make_fp(0, 0, [])
-    dx, dy = _pad_centroid_offset_mm(fp)
+    fp_data = _make_fp_data_with_raw(0, 0, [])
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert dx == 0.0
     assert dy == 0.0
 
 
 def test_centroid_missing_definition_returns_zero():
-    fp = MagicMock(spec=["position", "orientation", "layer"])
-    dx, dy = _pad_centroid_offset_mm(fp)
+    fp_raw = MagicMock(spec=["position"])  # no .definition
+    fp_data = FootprintData(
+        ref="U1",
+        value="",
+        footprint_id="L:P",
+        layer="F",
+        pos_x=0,
+        pos_y=0,
+        rotation=0,
+        dnp=False,
+        exclude_from_bom=False,
+        _raw=fp_raw,
+    )
+    adapter = KipyBoardAdapter(_make_mock_board())
+    dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert dx == 0.0
     assert dy == 0.0
 
@@ -182,8 +215,6 @@ def test_rotated_preset_transforms_tayda_coords():
         fixed_holes=[FixedHole(label="Test", dia=9.5, x=30.0, y=-10.0)],
         side_b=[],
     )
-    board = MagicMock()
-    board.get_shapes.return_value = []  # triggers RuntimeError → skip via except
 
     # generate_enclosure_pdf raises if no edge cuts; test the transform directly
     # by inspecting what the renderer records and transform logic.

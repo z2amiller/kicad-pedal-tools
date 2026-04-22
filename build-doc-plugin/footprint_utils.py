@@ -1,8 +1,7 @@
-"""Helpers for working with kipy footprint objects."""
+"""Helpers for working with FootprintData objects from BoardAdapter."""
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
@@ -36,63 +35,38 @@ class Controls:
     internal: List[ControlEntry]
 
 
-def safe_get_footprints(board, log: Optional[Callable] = None) -> List:
-    """Return board.get_footprints() as a list, or [] if the IPC API raises."""
+def safe_get_footprints(adapter, log: Optional[Callable] = None) -> List:
+    """Return adapter.get_footprints() as a list, or [] on error."""
     try:
-        return list(board.get_footprints())
+        return list(adapter.get_footprints())
     except Exception as exc:
         if log:
             log(f"  Warning: could not retrieve footprints: {exc}")
         return []
 
 
-def safe_get_shapes(board, log: Optional[Callable] = None) -> List:
-    """Return board.get_shapes() as a list, or [] if the IPC API raises."""
+def get_board_path(adapter) -> str:
+    """Return the full absolute path to the board .kicad_pcb file."""
     try:
-        return list(board.get_shapes())
-    except Exception as exc:
-        if log:
-            log(f"  Warning: could not retrieve board shapes: {exc}")
-        return []
-
-
-def get_board_path(board) -> str:
-    """Return the full absolute path to the board .kicad_pcb file.
-
-    kipy's board.name returns DocumentSpecifier.board_filename which may be
-    just a bare filename. If it isn't already an absolute path on disk,
-    resolve it via the project directory from board.get_project().path.
-    """
-    name = board.name
-    if name and os.path.isabs(name) and os.path.exists(name):
-        return name
-    try:
-        project_dir = board.get_project().path
-        if project_dir:
-            candidate = os.path.join(project_dir, os.path.basename(name))
-            if os.path.exists(candidate):
-                return candidate
+        return adapter.get_board_path()
     except Exception:
-        pass
-    return name
+        return ""
 
 
-def get_field(fp, name: str) -> str:
-    """Return the text of a footprint field by name, or '' if absent."""
-    name_lower = name.lower()
-    for item in fp.texts_and_fields:
-        item_name = getattr(item, "name", None)
-        if item_name is not None and item_name.lower() == name_lower:
-            text = getattr(item, "text", None)
-            if text is not None:
-                return str(getattr(text, "value", "")).strip()
-    return ""
+def get_field(fp_data, name: str) -> str:
+    """Return the value of a footprint field by name (case-insensitive), or ''."""
+    try:
+        return fp_data.fields.get(name.lower(), "")
+    except Exception:
+        return ""
 
 
-def get_fp_id(fp) -> str:
+def get_fp_id(fp_data) -> str:
     """Return 'LibNickname:LibItemName' for a footprint."""
-    lib_id = fp.definition.id
-    return "{}:{}".format(lib_id.library, lib_id.name)
+    try:
+        return fp_data.footprint_id
+    except Exception:
+        return ""
 
 
 def ref_sort_key(ref: str) -> Tuple[str, int]:
@@ -139,22 +113,15 @@ _EXCLUDE_INTERNAL_RE = re.compile(r"^(D|LED|TP)\d*$", re.IGNORECASE)
 _LED_LIBRARY_RE = re.compile(r"^(LED_SMD|LED_THT|Diode_SMD|Diode_THT)", re.IGNORECASE)
 
 
-def _is_led_footprint(fp) -> bool:
+def _is_led_footprint(fp_data) -> bool:
     try:
-        library = fp.definition.id.library
+        library = fp_data.footprint_id.split(":")[0]
         return bool(_LED_LIBRARY_RE.match(library))
     except Exception:
         return False
 
 
-def _is_single_pad(fp) -> bool:
-    try:
-        return len(fp.pads) <= 1
-    except Exception:
-        return False
-
-
-def extract_controls(board, external_ids: set) -> Controls:
+def extract_controls(adapter, external_ids: set) -> Controls:
     """Return Controls with external and internal ControlEntry lists.
 
     External = footprint ID in external_ids; internal = everything else
@@ -168,21 +135,21 @@ def extract_controls(board, external_ids: set) -> Controls:
     internal: List[ControlEntry] = []
     seen: set = set()
 
-    for fp in safe_get_footprints(board):
-        ref = fp.reference_field.text.value
+    for fp_data in safe_get_footprints(adapter):
+        ref = fp_data.ref
         if ref.startswith("~") or ref in ("REF**", ""):
             continue
-        if _EXCLUDE_ALL_RE.match(ref) or _is_led_footprint(fp):
+        if _EXCLUDE_ALL_RE.match(ref) or _is_led_footprint(fp_data):
             continue
-        label = get_field(fp, "Control")
+        label = get_field(fp_data, "Control")
         if not label or label in seen:
             continue
         seen.add(label)
 
-        entry = ControlEntry(ref=ref, label=label, value=fp.value_field.text.value)
-        if get_fp_id(fp) in external_ids:
+        entry = ControlEntry(ref=ref, label=label, value=fp_data.value)
+        if fp_data.footprint_id in external_ids:
             external.append(entry)
-        elif not _EXCLUDE_INTERNAL_RE.match(ref) and not _is_single_pad(fp):
+        elif not _EXCLUDE_INTERNAL_RE.match(ref) and fp_data.pad_count > 1:
             internal.append(entry)
 
     external.sort(key=lambda c: ref_sort_key(c.ref))

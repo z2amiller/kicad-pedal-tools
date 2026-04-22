@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from kicad_pedal_common.drill import DrillHole
 
@@ -41,6 +41,8 @@ class FootprintData:
     dnp: bool
     exclude_from_bom: bool
     description: str = ""   # human-readable component description (optional)
+    fields: Dict[str, str] = field(default_factory=dict)  # custom KiCad fields, lowercase keys
+    pad_count: int = 0
     # Opaque reference to the underlying fp object; not shown in repr.
     _raw: object = field(default=None, repr=False, compare=False)
 
@@ -83,6 +85,18 @@ class BoardAdapter:
     def get_drill_holes(self) -> List[DrillHole]:
         """Return all THT/NPTH drill holes on the board in board-space mm."""
         return []
+
+    def get_board_path(self) -> str:
+        """Return absolute path to the .kicad_pcb file."""
+        return ""
+
+    def get_board_bounding_box(self) -> Optional[Tuple[float, float, float, float]]:
+        """Return (min_x_mm, max_x_mm, min_y_mm, max_y_mm) of Edge.Cuts outline, or None."""
+        return None
+
+    def get_pad_centroid_offset(self, fp_data: "FootprintData") -> Tuple[float, float]:
+        """Return (dx_mm, dy_mm) pad centroid offset from fp position in board frame."""
+        return (0.0, 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +157,64 @@ class KipyBoardAdapter(BoardAdapter):
             return BBoxCenter(cx_mm=cx_mm, cy_mm=cy_mm)
         except Exception:
             return None
+
+    def get_board_path(self) -> str:
+        import os
+        board = self._board
+        try:
+            name = board.name
+        except Exception:
+            return ""
+        if name and os.path.isabs(name) and os.path.exists(name):
+            return name
+        try:
+            project_dir = board.get_project().path
+            if project_dir:
+                candidate = os.path.join(project_dir, os.path.basename(name))
+                if os.path.exists(candidate):
+                    return candidate
+        except Exception:
+            pass
+        return name or ""
+
+    def get_board_bounding_box(self) -> Optional[Tuple[float, float, float, float]]:
+        try:
+            from kipy.board import BoardLayer  # type: ignore[import]
+            shapes = [
+                s for s in self._board.get_shapes()
+                if s.layer == BoardLayer.BL_Edge_Cuts
+            ]
+            if not shapes:
+                return None
+            bboxes = self._board.get_item_bounding_box(shapes)
+            if not bboxes:
+                return None
+            result = bboxes[0]
+            for b in bboxes[1:]:
+                result.merge(b)
+            center = result.center()
+            size = result.size
+            cx = center.x / NM_PER_MM
+            cy = center.y / NM_PER_MM
+            hw = size.x / NM_PER_MM / 2.0
+            hh = size.y / NM_PER_MM / 2.0
+            return (cx - hw, cx + hw, cy - hh, cy + hh)
+        except Exception:
+            return None
+
+    def get_pad_centroid_offset(self, fp_data: "FootprintData") -> Tuple[float, float]:
+        fp = fp_data._raw
+        if fp is None:
+            return (0.0, 0.0)
+        try:
+            pads = list(fp.definition.pads)
+            if not pads:
+                return (0.0, 0.0)
+            cx = sum(p.position.x for p in pads) / len(pads) - fp.position.x
+            cy = sum(p.position.y for p in pads) / len(pads) - fp.position.y
+            return (cx / NM_PER_MM, cy / NM_PER_MM)
+        except Exception:
+            return (0.0, 0.0)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -216,6 +288,30 @@ class KipyBoardAdapter(BoardAdapter):
         except Exception:
             pass
 
+        # Custom fields (lowercase keys)
+        fields: Dict[str, str] = {}
+        try:
+            for item in fp.texts_and_fields:  # type: ignore[union-attr]
+                item_name = getattr(item, "name", None)
+                if item_name:
+                    text_val = ""
+                    try:
+                        text_val = str(
+                            getattr(getattr(item, "text", None), "value", "")
+                        ).strip()
+                    except Exception:
+                        pass
+                    fields[item_name.lower()] = text_val
+        except Exception:
+            pass
+
+        # Pad count
+        pad_count = 0
+        try:
+            pad_count = len(fp.pads)  # type: ignore[union-attr]
+        except Exception:
+            pass
+
         return FootprintData(
             ref=ref,
             value=value,
@@ -227,6 +323,8 @@ class KipyBoardAdapter(BoardAdapter):
             dnp=dnp,
             exclude_from_bom=exclude_from_bom,
             description=description,
+            fields=fields,
+            pad_count=pad_count,
             _raw=fp,
         )
 

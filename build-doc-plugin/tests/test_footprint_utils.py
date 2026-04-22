@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from kicad_pedal_common.board_adapter import FootprintData
 
 from footprint_utils import (
     Controls,
@@ -45,68 +45,79 @@ def test_friendly_type_unknown_no_fp_name():
     assert friendly_footprint_type("XY1", "") == "Component"
 
 
-def _make_field(name, value):
-    """Build a kipy-style Field mock."""
-    f = MagicMock()
-    f.name = name
-    f.text.value = value
-    return f
+def _make_fp_data(fields_dict=None, ref="U1", fp_id="Lib:Part", pad_count=3, value="val"):
+    return FootprintData(
+        ref=ref,
+        value=value,
+        footprint_id=fp_id,
+        layer="F",
+        pos_x=0,
+        pos_y=0,
+        rotation=0,
+        dnp=False,
+        exclude_from_bom=False,
+        fields=fields_dict or {},
+        pad_count=pad_count,
+    )
+
+
+class MockAdapter:
+    def __init__(self, fps):
+        self._fps = fps
+
+    def get_footprints(self):
+        return self._fps
 
 
 def test_get_field_found():
-    fp = MagicMock()
-    fp.texts_and_fields = [_make_field("Control", "  Volume  ")]
+    fp = _make_fp_data(fields_dict={"control": "Volume"})
     assert get_field(fp, "Control") == "Volume"
 
 
 def test_get_field_found_case_insensitive():
-    fp = MagicMock()
-    fp.texts_and_fields = [_make_field("control", "Level")]
+    fp = _make_fp_data(fields_dict={"control": "Level"})
     assert get_field(fp, "Control") == "Level"
 
 
 def test_get_field_missing():
-    fp = MagicMock()
-    fp.texts_and_fields = []
+    fp = _make_fp_data(fields_dict={})
     assert get_field(fp, "Control") == ""
 
 
 def test_get_field_wrong_name():
-    fp = MagicMock()
-    fp.texts_and_fields = [_make_field("Datasheet", "http://example.com")]
+    fp = _make_fp_data(fields_dict={"datasheet": "http://example.com"})
     assert get_field(fp, "Control") == ""
 
 
 def test_get_field_non_field_item_skipped():
-    # BoardText items (no .name attribute) should be silently skipped.
-    item = MagicMock(spec=[])  # spec=[] → no attributes → getattr returns None
-    fp = MagicMock()
-    fp.texts_and_fields = [item]
+    # With FootprintData, there's no longer a "non-field item" concept
+    # This test becomes: absent key returns ""
+    fp = _make_fp_data(fields_dict={})
     assert get_field(fp, "Control") == ""
 
 
 # ── extract_controls ──────────────────────────────────────────────────────────
 
 
-def _make_fp_with_control(ref, value, control, fp_id="Lib:Part"):
-    fp = MagicMock()
-    fp.reference_field.text.value = ref
-    fp.value_field.text.value = value
-    lib, name = fp_id.split(":")
-    fp.definition.id.library = lib
-    fp.definition.id.name = name
-    field = MagicMock()
-    field.name = "Control"
-    field.text.value = control
-    fp.texts_and_fields = [field]
-    fp.pads = [object(), object(), object()]  # default: multi-pad, not filtered
-    return fp
+def _make_fp_with_control(ref, value, control, fp_id="Lib:Part", pad_count=3):
+    fields = {"control": control} if control else {}
+    return FootprintData(
+        ref=ref,
+        value=value,
+        footprint_id=fp_id,
+        layer="F",
+        pos_x=0,
+        pos_y=0,
+        rotation=0,
+        dnp=False,
+        exclude_from_bom=False,
+        fields=fields,
+        pad_count=pad_count,
+    )
 
 
 def _make_board_ec(fps):
-    board = MagicMock()
-    board.get_footprints.return_value = fps
-    return board
+    return MockAdapter(fps)
 
 
 def test_extract_controls_empty_board():
@@ -115,9 +126,7 @@ def test_extract_controls_empty_board():
 
 
 def test_extract_controls_no_control_field():
-    fp = MagicMock()
-    fp.reference_field.text.value = "R1"
-    fp.texts_and_fields = []
+    fp = _make_fp_data(ref="R1", fields_dict={})
     result = extract_controls(_make_board_ec([fp]), set())
     assert result == Controls(external=[], internal=[])
 
@@ -152,8 +161,6 @@ def test_extract_controls_excludes_leds_and_diodes():
 
 
 def test_extract_controls_excludes_led_smd_library():
-    # SMD LED with non-standard ref (e.g. D5 shows up as D, but test a case
-    # where the ref alone wouldn't catch it).
     fp = _make_fp_with_control("U5", "LED", "Status", fp_id="LED_SMD:LED_0805_2012Metric")
     result = extract_controls(_make_board_ec([fp]), set())
     assert result == Controls(external=[], internal=[])
@@ -166,15 +173,13 @@ def test_extract_controls_excludes_test_points_from_internal():
 
 
 def test_extract_controls_excludes_single_pad_from_internal():
-    fp = _make_fp_with_control("RV1", "B100K", "Volume")
-    fp.pads = []  # zero pads → single-pad filter triggers
+    fp = _make_fp_with_control("RV1", "B100K", "Volume", pad_count=0)
     result = extract_controls(_make_board_ec([fp]), set())
     assert result == Controls(external=[], internal=[])
 
 
 def test_extract_controls_keeps_multi_pad_internal():
-    fp = _make_fp_with_control("RV1", "B100K", "Volume")
-    fp.pads = [object(), object(), object()]  # 3 pads → kept
+    fp = _make_fp_with_control("RV1", "B100K", "Volume", pad_count=3)
     result = extract_controls(_make_board_ec([fp]), set())
     assert len(result.internal) == 1
 

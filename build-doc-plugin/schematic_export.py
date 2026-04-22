@@ -11,11 +11,10 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas as rl_canvas
 
 from cli_utils import find_kicad_cli, kicad_env
-from footprint_utils import get_board_path
 
 
 def export_schematic_pdf(
-    board,
+    board_path: str,
     params,
     tmpdir: str,
     log: Optional[Callable] = None,
@@ -27,7 +26,6 @@ def export_schematic_pdf(
     sub-sheets automatically.
     """
     _log = log or (lambda msg: None)
-    board_path = get_board_path(board)
     canonical = os.path.splitext(board_path)[0] + ".kicad_sch"
     override = params.sch_path.strip()
     root_sch = canonical if os.path.exists(canonical) else (override or canonical)

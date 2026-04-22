@@ -37,7 +37,6 @@ from board_image import apply_board_pdf_to_cover, export_board_pdf  # noqa: E402
 from bom_pages import build_bom_story  # noqa: E402
 from cover_page import build_cover_story  # noqa: E402
 from enclosure_template import board_size_mm, generate_enclosure_pdf  # noqa: E402
-from footprint_utils import get_board_path  # noqa: E402
 from panel_config import load_panel_config, snapshot_global_to_project  # noqa: E402
 from pdf_utils import MARGIN, make_page_footer, merge_pdfs  # noqa: E402
 from schematic_export import export_schematic_pdf, stamp_schematic_footer  # noqa: E402
@@ -47,11 +46,11 @@ from tayda_manifest import generate_tayda_manifest_pdf  # noqa: E402
 class BuildDocGenerator:
     def __init__(
         self,
-        board,
+        adapter,
         params: GeneratorParams,
         log: Optional[Callable] = None,
     ):
-        self.board = board
+        self.adapter = adapter
         self.params = params
         self.project_name = params.project_name
         self.author = params.author
@@ -61,6 +60,7 @@ class BuildDocGenerator:
         self._log = log or (lambda msg: None)
         self.total_pages = 0
         self._plugin_dir = os.path.dirname(os.path.realpath(__file__))
+        self._board_path = adapter.get_board_path()
 
     def generate(self) -> None:
         body_pdf = os.path.join(self.tmpdir, "body.pdf")
@@ -76,7 +76,7 @@ class BuildDocGenerator:
         if self.params.include_cover:
             self._log("Exporting board image…")
             try:
-                board_pdf_path = export_board_pdf(self.board, self.tmpdir, self._log)
+                board_pdf_path = export_board_pdf(self._board_path, self.tmpdir, self._log)
             except Exception as e:
                 self._log(f"  Board image failed: {e}")
 
@@ -94,7 +94,7 @@ class BuildDocGenerator:
         sch_count = 0
         if has_sch:
             self._log("Exporting schematic…")
-            raw_sch = export_schematic_pdf(self.board, self.params, self.tmpdir, self._log)
+            raw_sch = export_schematic_pdf(self._board_path, self.params, self.tmpdir, self._log)
             if raw_sch:
                 sch_count = len(PdfReader(raw_sch).pages)
             else:
@@ -116,7 +116,7 @@ class BuildDocGenerator:
                     board_pdf_path,
                     board_slot,
                     overlaid,
-                    board_size_mm=board_size_mm(self.board),
+                    board_size_mm=board_size_mm(self.adapter),
                     log=self._log,
                 )
                 parts.append(overlaid)
@@ -139,9 +139,8 @@ class BuildDocGenerator:
         enc_label: Optional[str] = None
         if has_enc:
             self._log("Generating enclosure drilling template…")
-            board_path = get_board_path(self.board)
-            snapshot_global_to_project(board_path, self._plugin_dir, self._log)
-            config = load_panel_config(board_path, self._plugin_dir, self._log)
+            snapshot_global_to_project(self._board_path, self._plugin_dir, self._log)
+            config = load_panel_config(self._board_path, self._plugin_dir, self._log)
             enc = config.enclosure
             enc_label = (
                 f"{enc.preset} ({enc.width:.0f}\u00d7{enc.height:.0f} mm)"
@@ -149,7 +148,7 @@ class BuildDocGenerator:
                 else f"{enc.width:.0f}\u00d7{enc.height:.0f} mm"
             )
             self.enc_holes = generate_enclosure_pdf(
-                board=self.board,
+                adapter=self.adapter,
                 config=config,
                 project_name=self.project_name,
                 author=self.author,
@@ -196,7 +195,7 @@ class BuildDocGenerator:
 
         if self.params.include_cover:
             cover_story, board_slot = build_cover_story(
-                board=self.board,
+                adapter=self.adapter,
                 project_name=self.project_name,
                 author=self.author,
                 revision=self.revision,
@@ -211,7 +210,7 @@ class BuildDocGenerator:
             if story:
                 story.append(PageBreak())
             story += build_bom_story(
-                board=self.board,
+                adapter=self.adapter,
                 project_name=self.project_name,
                 styles=styles,
                 log=self._log,

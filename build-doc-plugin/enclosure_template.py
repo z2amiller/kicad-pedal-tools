@@ -7,17 +7,15 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from kipy.board import BoardLayer
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas as rl_canvas
 
-from footprint_utils import get_field, get_fp_id, safe_get_footprints, safe_get_shapes
+from footprint_utils import get_field, safe_get_footprints
 from panel_config import FootprintHoleConfig, PanelConfig, SnapConfig
 from pdf_utils import MARGIN
 
 MM = 72.0 / 25.4  # PDF points per mm
-NM_PER_MM = 1_000_000  # kipy uses nanometres
 
 _LED_RE = re.compile(r"^(D|LED)\d", re.IGNORECASE)
 _DEFAULT_BACK_LED_CFG = FootprintHoleConfig(
@@ -57,26 +55,13 @@ class TaydaHole:
     label: str = ""
 
 
-def _board_bbox(board):
-    """Return merged bounding box of all Edge.Cuts shapes as a kipy Box2, or None."""
-    edge_shapes = [s for s in safe_get_shapes(board) if s.layer == BoardLayer.BL_Edge_Cuts]
-    if not edge_shapes:
-        return None
-    bboxes = board.get_item_bounding_box(edge_shapes)
-    if not bboxes:
-        return None
-    result = bboxes[0]
-    for b in bboxes[1:]:
-        result.merge(b)
-    return result
-
-
-def board_size_mm(board) -> Optional[tuple]:
-    """Return (width_mm, height_mm) from the board's Edge.Cuts bounding box, or None."""
+def board_size_mm(adapter) -> Optional[tuple]:
+    """Return (width_mm, height_mm) from adapter's board bounding box, or None."""
     try:
-        bbox = _board_bbox(board)
+        bbox = adapter.get_board_bounding_box()
         if bbox:
-            return (bbox.size.x / NM_PER_MM, bbox.size.y / NM_PER_MM)
+            min_x, max_x, min_y, max_y = bbox
+            return (max_x - min_x, max_y - min_y)
     except Exception:
         pass
     return None
@@ -247,25 +232,25 @@ class _EnclosureRenderer:
 
     def draw_footprint_holes(
         self,
-        board,
+        adapter,
         fp_config: Dict,
         log,
         highlight_fp_ids: Optional[Set[str]] = None,
         highlight_refs: Optional[Set[str]] = None,
     ) -> None:
         """Iterate fp_config footprints and draw their holes."""
-        for fp in safe_get_footprints(board, log):
-            fp_id = get_fp_id(fp)
+        for fp_data in safe_get_footprints(adapter, log):
+            fp_id = fp_data.footprint_id
             if fp_id not in fp_config:
                 continue
             cfg = fp_config[fp_id]
-            ref_x, ref_y = _fp_pcb_pos_mm(fp, cfg)
+            ref_x, ref_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
             rx, ry = self.fp_to_enc(ref_x, ref_y)
-            enc_dx, enc_dy = _fp_enc_offset(fp, cfg)
+            enc_dx, enc_dy = _fp_enc_offset(fp_data, cfg)
             ex = rx + enc_dx
             ey = ry + enc_dy
-            label = cfg.label or get_field(fp, "Control") or fp.reference_field.text.value
-            ref = fp.reference_field.text.value
+            label = cfg.label or get_field(fp_data, "Control") or fp_data.ref
+            ref = fp_data.ref
             highlighted = (highlight_refs and ref in highlight_refs) or (
                 highlight_fp_ids and fp_id in highlight_fp_ids
             )
@@ -274,27 +259,30 @@ class _EnclosureRenderer:
             log(
                 f"    {label}: ref ({rx:.2f}, {ry:.2f})"
                 f"  offset ({cfg.offset_x:+.1f}, {cfg.offset_y:+.1f})"
-                f"  hole ({ex:.2f}, {ey:.2f}) mm" + (" [centroid]" if cfg.use_pad_centroid else "")
+                f"  hole ({ex:.2f}, {ey:.2f}) mm"
+                + (" [centroid]" if cfg.use_pad_centroid else "")
             )
 
-    def draw_led_holes(self, board, fp_config: Dict, log) -> None:
+    def draw_led_holes(self, adapter, fp_config: Dict, log) -> None:
         """Draw holes for back-side LEDs/diodes not already in fp_config."""
-        for fp in safe_get_footprints(board, log):
-            ref = fp.reference_field.text.value
-            if not _is_back_copper_led(fp, ref):
+        for fp_data in safe_get_footprints(adapter, log):
+            if not _is_back_copper_led(fp_data):
                 continue
-            fp_id = get_fp_id(fp)
+            fp_id = fp_data.footprint_id
             if fp_id in fp_config:  # already drawn by draw_footprint_holes
                 continue
             cfg = fp_config.get(fp_id, _DEFAULT_BACK_LED_CFG)
-            pcb_x, pcb_y = _fp_pcb_pos_mm(fp, cfg)
+            pcb_x, pcb_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
             raw_x, raw_y = self.fp_to_enc(pcb_x, pcb_y)
-            enc_dx, enc_dy = _fp_enc_offset(fp, cfg)
+            enc_dx, enc_dy = _fp_enc_offset(fp_data, cfg)
             ex = raw_x + enc_dx
             ey = raw_y + enc_dy
             label = cfg.label or "LED"
             self.draw_hole(ex, ey, cfg.hole_dia, label)
-            log(f"    LED (back-side {ref}): enc ({ex:.1f}, {ey:.1f}) mm  \u00f8{cfg.hole_dia} mm")
+            log(
+                f"    LED (back-side {fp_data.ref}): "
+                f"enc ({ex:.1f}, {ey:.1f}) mm  \u00f8{cfg.hole_dia} mm"
+            )
 
     def draw_side_b_holes(self, side_b: List, log) -> None:
         """Draw Side B (top face) holes on the top tab and record them for Tayda.
@@ -435,7 +423,7 @@ class _EnclosureRenderer:
 
 
 def generate_enclosure_pdf(
-    board,
+    adapter,
     config: PanelConfig,
     project_name: str,
     author: str,
@@ -464,14 +452,15 @@ def generate_enclosure_pdf(
 
     pw, ph = letter
 
-    bbox = _board_bbox(board)
+    bbox = adapter.get_board_bounding_box()
     if bbox is None:
         raise RuntimeError("No Edge.Cuts shapes found — cannot determine board outline.")
-    board_cx = bbox.center().x / NM_PER_MM
+    min_x, max_x, min_y, max_y = bbox
+    board_cx = (min_x + max_x) / 2.0
 
-    top_pcb_y = _find_top_anchor(board, fp_config)
+    top_pcb_y = _find_top_anchor(adapter, fp_config)
     if top_pcb_y is None:
-        top_pcb_y = bbox.center().y / NM_PER_MM
+        top_pcb_y = (min_y + max_y) / 2.0
         _log("  No external controls found — falling back to board centre for Y.")
     else:
         _log(
@@ -531,9 +520,9 @@ def generate_enclosure_pdf(
         renderer.draw_centre_lines()
     renderer.draw_snap_lines(config.snap)
     renderer.draw_footprint_holes(
-        board, fp_config, _log, highlight_fp_ids=highlight_fp_ids, highlight_refs=highlight_refs
+        adapter, fp_config, _log, highlight_fp_ids=highlight_fp_ids, highlight_refs=highlight_refs
     )
-    renderer.draw_led_holes(board, fp_config, _log)
+    renderer.draw_led_holes(adapter, fp_config, _log)
     renderer.draw_fixed_holes(fixed_holes, _log)
     if not face_only:
         renderer.draw_side_b_holes(config.side_b, _log)
@@ -552,7 +541,11 @@ def generate_enclosure_pdf(
         def _rotate_to_portrait(h: TaydaHole) -> TaydaHole:
             tayda_side = "C" if h.side == "B" else h.side
             return TaydaHole(
-                side=tayda_side, diameter_mm=h.diameter_mm, x_mm=h.y_mm, y_mm=-h.x_mm, label=h.label
+                side=tayda_side,
+                diameter_mm=h.diameter_mm,
+                x_mm=h.y_mm,
+                y_mm=-h.x_mm,
+                label=h.label,
             )
 
         holes = [_rotate_to_portrait(h) for h in holes]
@@ -560,7 +553,7 @@ def generate_enclosure_pdf(
 
 
 def get_computed_holes(
-    board,
+    adapter,
     config: PanelConfig,
     log: Optional[Callable] = None,
 ) -> List[tuple]:
@@ -571,14 +564,15 @@ def get_computed_holes(
     """
     _log = log or (lambda msg: None)
     try:
-        bbox = _board_bbox(board)
+        bbox = adapter.get_board_bounding_box()
         if bbox is None:
             return []
-        board_cx = bbox.center().x / NM_PER_MM
+        min_x, max_x, min_y, max_y = bbox
+        board_cx = (min_x + max_x) / 2.0
         fp_config = config.footprints
-        top_pcb_y = _find_top_anchor(board, fp_config)
+        top_pcb_y = _find_top_anchor(adapter, fp_config)
         if top_pcb_y is None:
-            top_pcb_y = bbox.center().y / NM_PER_MM
+            top_pcb_y = (min_y + max_y) / 2.0
 
         snap = config.snap
         r = _EnclosureRenderer(
@@ -586,28 +580,27 @@ def get_computed_holes(
         )
         results: List[tuple] = []
 
-        for fp in safe_get_footprints(board, _log):
-            fp_id = get_fp_id(fp)
+        for fp_data in safe_get_footprints(adapter, _log):
+            fp_id = fp_data.footprint_id
             if fp_id not in fp_config:
                 continue
             cfg = fp_config[fp_id]
-            ref_x, ref_y = _fp_pcb_pos_mm(fp, cfg)
+            ref_x, ref_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
             rx, ry = r.fp_to_enc(ref_x, ref_y)
-            enc_dx, enc_dy = _fp_enc_offset(fp, cfg)
+            enc_dx, enc_dy = _fp_enc_offset(fp_data, cfg)
             ex, ey = _apply_snap(rx + enc_dx, ry + enc_dy, snap)
-            label = cfg.label or get_field(fp, "Control") or fp.reference_field.text.value
+            label = cfg.label or get_field(fp_data, "Control") or fp_data.ref
             results.append((label, cfg.hole_dia, ex, ey))
 
-        for fp in safe_get_footprints(board, _log):
-            ref = fp.reference_field.text.value
-            if not _is_back_copper_led(fp, ref):
+        for fp_data in safe_get_footprints(adapter, _log):
+            if not _is_back_copper_led(fp_data):
                 continue
-            fp_id = get_fp_id(fp)
+            fp_id = fp_data.footprint_id
             if fp_id in fp_config:  # already included in fp_config loop above
                 continue
             cfg = fp_config.get(fp_id, _DEFAULT_BACK_LED_CFG)
-            pcb_x, pcb_y = _fp_pcb_pos_mm(fp, cfg)
-            enc_dx, enc_dy = _fp_enc_offset(fp, cfg)
+            pcb_x, pcb_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
+            enc_dx, enc_dy = _fp_enc_offset(fp_data, cfg)
             rx, ry = r.fp_to_enc(pcb_x, pcb_y)
             ex, ey = _apply_snap(rx + enc_dx, ry + enc_dy, snap)
             results.append((cfg.label or "LED", cfg.hole_dia, ex, ey))
@@ -619,7 +612,7 @@ def get_computed_holes(
 
 
 def get_footprint_entries(
-    board,
+    adapter,
     config: PanelConfig,
     log: Optional[Callable] = None,
 ) -> List[dict]:
@@ -631,67 +624,63 @@ def get_footprint_entries(
     """
     _log = log or (lambda msg: None)
     try:
-        bbox = _board_bbox(board)
+        bbox = adapter.get_board_bounding_box()
         if bbox is None:
             return []
-        board_cx = bbox.center().x / NM_PER_MM
+        min_x, max_x, min_y, max_y = bbox
+        board_cx = (min_x + max_x) / 2.0
         fp_config = config.footprints
-        top_pcb_y = _find_top_anchor(board, fp_config)
+        top_pcb_y = _find_top_anchor(adapter, fp_config)
         if top_pcb_y is None:
-            top_pcb_y = bbox.center().y / NM_PER_MM
+            top_pcb_y = (min_y + max_y) / 2.0
 
         r = _EnclosureRenderer(
             None, 0, 0, 0, 0, 0, 0, 0, board_cx, top_pcb_y, top_row_mm=config.snap.top_row_mm
         )
         results: List[dict] = []
 
-        for fp in safe_get_footprints(board, _log):
-            fp_id = get_fp_id(fp)
+        for fp_data in safe_get_footprints(adapter, _log):
+            fp_id = fp_data.footprint_id
             if fp_id not in fp_config:
                 continue
             cfg = fp_config[fp_id]
-            ref_x, ref_y = _fp_pcb_pos_mm(fp, cfg)
+            ref_x, ref_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
             ref_enc_x, ref_enc_y = r.fp_to_enc(ref_x, ref_y)
-            label = cfg.label or get_field(fp, "Control") or fp.reference_field.text.value
+            label = cfg.label or get_field(fp_data, "Control") or fp_data.ref
             results.append(
                 {
                     "fp_id": fp_id,
-                    "reference": fp.reference_field.text.value,
+                    "reference": fp_data.ref,
                     "label": label,
                     "hole_dia": cfg.hole_dia,
                     "offset_x": cfg.offset_x,
                     "offset_y": cfg.offset_y,
                     "ref_enc_x": ref_enc_x,
                     "ref_enc_y": ref_enc_y,
-                    "orientation_rad": fp.orientation.to_radians()
-                    if hasattr(fp, "orientation")
-                    else 0.0,
+                    "orientation_rad": math.radians(fp_data.rotation),
                 }
             )
 
-        for fp in safe_get_footprints(board, _log):
-            ref = fp.reference_field.text.value
-            if not _is_back_copper_led(fp, ref):
+        for fp_data in safe_get_footprints(adapter, _log):
+            if not _is_back_copper_led(fp_data):
                 continue
-            fp_id = get_fp_id(fp)
+            fp_id = fp_data.footprint_id
             if fp_id in fp_config:  # already included above
                 continue
             cfg = fp_config.get(fp_id, _DEFAULT_BACK_LED_CFG)
-            ref_x, ref_y = _fp_pcb_pos_mm(fp, cfg)
+            ref_x, ref_y = _fp_pcb_pos_mm(fp_data, cfg, adapter)
             ref_enc_x, ref_enc_y = r.fp_to_enc(ref_x, ref_y)
             results.append(
                 {
                     "fp_id": fp_id,
-                    "reference": ref,
+                    "reference": fp_data.ref,
                     "label": cfg.label or "LED",
                     "hole_dia": cfg.hole_dia,
                     "offset_x": cfg.offset_x,
                     "offset_y": cfg.offset_y,
                     "ref_enc_x": ref_enc_x,
                     "ref_enc_y": ref_enc_y,
-                    "orientation_rad": fp.orientation.to_radians()
-                    if hasattr(fp, "orientation")
-                    else 0.0,
+                    "orientation_rad": math.radians(fp_data.rotation),
                     "use_pad_centroid": True,
                 }
             )
@@ -708,38 +697,33 @@ def _rotate_vector(dx: float, dy: float, angle_rad: float) -> Tuple[float, float
     return (cos_a * dx - sin_a * dy, sin_a * dx + cos_a * dy)
 
 
-def _is_back_copper_led(fp, ref: str) -> bool:
-    """Return True if fp is a back-copper LED/diode for heuristic hole detection."""
+def _is_back_copper_led(fp_data) -> bool:
+    """Return True if fp_data is a back-copper LED/diode for heuristic hole detection."""
     try:
-        return bool(_LED_RE.match(ref) and fp.layer == BoardLayer.BL_B_Cu)
+        return bool(_LED_RE.match(fp_data.ref) and fp_data.layer == "B")
     except Exception:
         return False
 
 
-def _fp_enc_offset(fp, cfg) -> Tuple[float, float]:
+def _fp_enc_offset(fp_data, cfg) -> Tuple[float, float]:
     """Return enclosure-space (dx, dy) for cfg's offset_x/y, rotating with the footprint.
 
     Offsets are defined in enclosure space for a 0°-rotation footprint (+X = right on
     panel, +Y = up on panel).  For rotated footprints the offset vector is rotated by the
-    same angle so it stays aligned with the physical component — e.g. a pot installed
-    sideways (90°) will have its offset rotated 90° in the enclosure view automatically.
+    same angle so it stays aligned with the physical component.
 
     At 0° rotation this reduces to (offset_x, offset_y), preserving the old behaviour.
     """
-    try:
-        a = fp.orientation.to_radians()
-    except Exception:
-        a = 0.0
+    a = math.radians(fp_data.rotation)
     return _rotate_vector(cfg.offset_x, cfg.offset_y, a)
 
 
-def _fp_pcb_pos_mm(fp, cfg) -> Tuple[float, float]:
+def _fp_pcb_pos_mm(fp_data, cfg, adapter) -> Tuple[float, float]:
     """Return PCB (x, y) in mm for a footprint, with pad centroid applied if configured."""
-    x = fp.position.x / NM_PER_MM
-    y = fp.position.y / NM_PER_MM
+    x, y = fp_data.pos_x, fp_data.pos_y
     if cfg.use_pad_centroid:
         try:
-            dx, dy = _pad_centroid_offset_mm(fp)
+            dx, dy = adapter.get_pad_centroid_offset(fp_data)
             x += dx
             y += dy
         except Exception:
@@ -747,46 +731,21 @@ def _fp_pcb_pos_mm(fp, cfg) -> Tuple[float, float]:
     return x, y
 
 
-def _pad_centroid_offset_mm(fp) -> tuple:
-    """Return pad centroid as (dx, dy) offset from fp.position, in mm (PCB frame).
-
-    Pad positions in fp.definition.pads are in the footprint's local coordinate
-    system (nanometres). We rotate by fp.orientation to get the PCB-frame offset.
-    Falls back to (0, 0) on any error or if no pads are present.
-    """
-    try:
-        pads = list(fp.definition.pads)
-    except AttributeError:
-        return (0.0, 0.0)
-    if not pads:
-        return (0.0, 0.0)
-    # kipy reports pad positions in absolute board coordinates (nanometres).
-    # Subtract fp.position to get the PCB-frame offset of the pad centroid.
-    # No rotation needed — the result is already in PCB frame.
-    cx = sum(p.position.x for p in pads) / len(pads) - fp.position.x
-    cy = sum(p.position.y for p in pads) / len(pads) - fp.position.y
-    return (cx / NM_PER_MM, cy / NM_PER_MM)
-
-
-def _find_top_anchor(board, fp_config: Dict) -> Optional[float]:
+def _find_top_anchor(adapter, fp_config: Dict) -> Optional[float]:
     """Find the minimum effective PCB Y among external-control footprints.
 
     Uses the hole's actual PCB Y (footprint origin + rotated offset Y component)
     so we anchor on the topmost *hole* rather than the topmost footprint *origin*.
     """
     top_pcb_y: Optional[float] = None
-    for fp in safe_get_footprints(board):
-        fp_id = get_fp_id(fp)
-        if fp_id not in fp_config:
+    for fp_data in safe_get_footprints(adapter):
+        if fp_data.footprint_id not in fp_config:
             continue
-        cfg = fp_config[fp_id]
-        try:
-            a = fp.orientation.to_radians()
-        except Exception:
-            a = 0.0
+        cfg = fp_config[fp_data.footprint_id]
+        a = math.radians(fp_data.rotation)
         # enc_off_y rotates with the footprint; hole PCB Y = fp_y - enc_off_y
         _, enc_off_y = _rotate_vector(cfg.offset_x, cfg.offset_y, a)
-        effective_y = fp.position.y / NM_PER_MM - enc_off_y
+        effective_y = fp_data.pos_y - enc_off_y
         if top_pcb_y is None or effective_y < top_pcb_y:
             top_pcb_y = effective_y
     return top_pcb_y

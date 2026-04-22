@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional
 
-from footprint_utils import get_field, get_fp_id, ref_sort_key, safe_get_footprints
+from footprint_utils import get_field, ref_sort_key, safe_get_footprints
 
 
 @dataclass
@@ -34,8 +34,8 @@ class FootprintRow:
         return self.description_changed() or self.notes_changed()
 
 
-def resolve_notes(fp) -> str:
-    """Return the best available notes string for a footprint.
+def resolve_notes(fp_data) -> str:
+    """Return the best available notes string for a FootprintData object.
 
     Resolution order:
       1. 'Notes' custom field
@@ -43,20 +43,20 @@ def resolve_notes(fp) -> str:
       3. 'Datasheet' field (first line, truncated to 80 chars)
       4. Empty string
     """
-    notes = get_field(fp, "Notes")
+    notes = get_field(fp_data, "Notes")
     if notes:
         return notes
-    desc = get_field(fp, "Description")
+    desc = get_field(fp_data, "Description")
     if desc:
         return desc
-    datasheet = get_field(fp, "Datasheet")
+    datasheet = get_field(fp_data, "Datasheet")
     if datasheet:
         first_line = datasheet.split("\n")[0].strip()
         return first_line[:80]
     return ""
 
 
-def load_footprints(board) -> List[FootprintRow]:
+def load_footprints(adapter) -> List[FootprintRow]:
     """Return all non-placeholder footprints as FootprintRow objects.
 
     Sorted by (value, ref) so similar components are adjacent.
@@ -66,34 +66,30 @@ def load_footprints(board) -> List[FootprintRow]:
     from footprint_utils import friendly_footprint_type
 
     rows: List[FootprintRow] = []
-    for fp in safe_get_footprints(board):
-        ref = fp.reference_field.text.value
+    for fp_data in safe_get_footprints(adapter):
+        ref = fp_data.ref
         if not ref or ref.startswith("~") or ref in ("REF**", ""):
             continue
 
-        control = get_field(fp, "Control")
+        control = get_field(fp_data, "Control")
         if not control:
-            attrs = fp.attributes
-            if (
-                attrs.exclude_from_bill_of_materials
-                or attrs.exclude_from_position_files
-                or attrs.do_not_populate
-            ):
+            if fp_data.exclude_from_bom or fp_data.dnp:
                 continue
 
-        desc = get_field(fp, "Description")
-        notes = get_field(fp, "Notes")
-        fp_id = get_fp_id(fp)
-        fp_type = friendly_footprint_type(ref, fp.definition.id.name)
+        desc = get_field(fp_data, "Description") or fp_data.description
+        notes = get_field(fp_data, "Notes")
+        fp_id = fp_data.footprint_id
+        fp_name = fp_id.split(":")[-1] if fp_id else ""
+        fp_type = friendly_footprint_type(ref, fp_name)
 
         row = FootprintRow(
             ref=ref,
-            value=fp.value_field.text.value,
+            value=fp_data.value,
             fp_type=fp_type,
             fp_id=fp_id,
             description=desc,
             notes=notes,
-            _fp=fp,
+            _fp=fp_data._raw,
             _orig_description=desc,
             _orig_notes=notes,
         )

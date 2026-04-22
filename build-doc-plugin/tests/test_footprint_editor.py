@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+from kicad_pedal_common.board_adapter import FootprintData
+
 from footprint_editor import FootprintRow, commit_edits, load_footprints, resolve_notes
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -15,63 +17,90 @@ def _make_field(name, value):
     return f
 
 
-def _make_fp(ref, value, fields=None, fp_id="Device:Generic", layer=None):
+def _make_raw_fp(ref, value, fields_dict=None):
+    """Build a minimal kipy-style mock for use as _raw in FootprintData."""
     fp = MagicMock()
     fp.reference_field.text.value = ref
     fp.value_field.text.value = value
-    fp.definition.id.library = fp_id.split(":")[0]
-    fp.definition.id.name = fp_id.split(":")[1]
-    fp.texts_and_fields = [_make_field(k, v) for k, v in (fields or {}).items()]
+    fp.texts_and_fields = [_make_field(k, v) for k, v in (fields_dict or {}).items()]
     fp.attributes.exclude_from_bill_of_materials = False
     fp.attributes.exclude_from_position_files = False
     fp.attributes.do_not_populate = False
-    if layer is not None:
-        fp.layer = layer
     return fp
 
 
-def _make_board(fps):
-    board = MagicMock()
-    board.get_footprints.return_value = fps
-    return board
+def _make_fp_data(
+    ref,
+    value,
+    fields_dict=None,
+    fp_id="Device:Generic",
+    excluded_bom=False,
+    dnp=False,
+    raw_fp=None,
+):
+    """Build a FootprintData for testing."""
+    fields = {k.lower(): v for k, v in (fields_dict or {}).items()}
+    raw = raw_fp or _make_raw_fp(ref, value, fields_dict)
+    return FootprintData(
+        ref=ref,
+        value=value,
+        footprint_id=fp_id,
+        layer="F",
+        pos_x=0.0,
+        pos_y=0.0,
+        rotation=0.0,
+        dnp=dnp,
+        exclude_from_bom=excluded_bom,
+        fields=fields,
+        pad_count=3,
+        _raw=raw,
+    )
+
+
+class _MockAdapter:
+    def __init__(self, fp_data_list):
+        self._fps = fp_data_list
+
+    def get_footprints(self):
+        return self._fps
 
 
 # ── resolve_notes ─────────────────────────────────────────────────────────────
 
 
 def test_resolve_notes_prefers_notes_field():
-    fp = _make_fp("R1", "10k", {"Notes": "Metal film", "Description": "Resistor"})
+    fp = _make_fp_data("R1", "10k", {"Notes": "Metal film", "Description": "Resistor"})
     assert resolve_notes(fp) == "Metal film"
 
 
 def test_resolve_notes_falls_back_to_description():
-    fp = _make_fp("R1", "10k", {"Description": "Resistor, 1/4W"})
+    fp = _make_fp_data("R1", "10k", {"Description": "Resistor, 1/4W"})
     assert resolve_notes(fp) == "Resistor, 1/4W"
 
 
 def test_resolve_notes_falls_back_to_datasheet():
-    fp = _make_fp("R1", "10k", {"Datasheet": "https://example.com/ds.pdf"})
+    fp = _make_fp_data("R1", "10k", {"Datasheet": "https://example.com/ds.pdf"})
     assert resolve_notes(fp) == "https://example.com/ds.pdf"
 
 
 def test_resolve_notes_truncates_datasheet():
     long_url = "https://example.com/" + "x" * 100
-    fp = _make_fp("R1", "10k", {"Datasheet": long_url})
+    fp = _make_fp_data("R1", "10k", {"Datasheet": long_url})
     assert len(resolve_notes(fp)) <= 80
 
 
 def test_resolve_notes_takes_first_line_of_datasheet():
-    fp = _make_fp("R1", "10k", {"Datasheet": "line one\nline two"})
+    fp = _make_fp_data("R1", "10k", {"Datasheet": "line one\nline two"})
     assert resolve_notes(fp) == "line one"
 
 
 def test_resolve_notes_returns_empty_when_nothing():
-    fp = _make_fp("R1", "10k")
+    fp = _make_fp_data("R1", "10k")
     assert resolve_notes(fp) == ""
 
 
 def test_resolve_notes_skips_empty_notes_field():
-    fp = _make_fp("R1", "10k", {"Notes": "", "Description": "Resistor"})
+    fp = _make_fp_data("R1", "10k", {"Notes": "", "Description": "Resistor"})
     assert resolve_notes(fp) == "Resistor"
 
 
@@ -79,8 +108,8 @@ def test_resolve_notes_skips_empty_notes_field():
 
 
 def test_load_footprints_returns_rows():
-    fps = [_make_fp("R1", "10k", {"Description": "Resistor"})]
-    rows = load_footprints(_make_board(fps))
+    fps = [_make_fp_data("R1", "10k", {"Description": "Resistor"})]
+    rows = load_footprints(_MockAdapter(fps))
     assert len(rows) == 1
     assert rows[0].ref == "R1"
     assert rows[0].description == "Resistor"
@@ -88,50 +117,47 @@ def test_load_footprints_returns_rows():
 
 def test_load_footprints_skips_placeholder_refs():
     fps = [
-        _make_fp("REF**", "val"),
-        _make_fp("~1", "val"),
-        _make_fp("", "val"),
-        _make_fp("R1", "10k"),
+        _make_fp_data("REF**", "val"),
+        _make_fp_data("~1", "val"),
+        _make_fp_data("", "val"),
+        _make_fp_data("R1", "10k"),
     ]
-    rows = load_footprints(_make_board(fps))
+    rows = load_footprints(_MockAdapter(fps))
     assert len(rows) == 1
     assert rows[0].ref == "R1"
 
 
 def test_load_footprints_sorted_by_value_then_ref():
     fps = [
-        _make_fp("R10", "10k"),
-        _make_fp("C1", "100nF"),
-        _make_fp("R2", "10k"),
+        _make_fp_data("R10", "10k"),
+        _make_fp_data("C1", "100nF"),
+        _make_fp_data("R2", "10k"),
     ]
-    rows = load_footprints(_make_board(fps))
+    rows = load_footprints(_MockAdapter(fps))
     assert [r.ref for r in rows] == ["C1", "R2", "R10"]
 
 
 def test_load_footprints_excludes_dnp():
-    fp = _make_fp("R1", "10k")
-    fp.attributes.do_not_populate = True
-    rows = load_footprints(_make_board([fp]))
+    fp = _make_fp_data("R1", "10k", dnp=True)
+    rows = load_footprints(_MockAdapter([fp]))
     assert len(rows) == 0
 
 
 def test_load_footprints_excludes_no_bom():
-    fp = _make_fp("R1", "10k")
-    fp.attributes.exclude_from_bill_of_materials = True
-    rows = load_footprints(_make_board([fp]))
+    fp = _make_fp_data("R1", "10k", excluded_bom=True)
+    rows = load_footprints(_MockAdapter([fp]))
     assert len(rows) == 0
 
 
 def test_load_footprints_keeps_dnp_control():
-    fp = _make_fp("RV1", "B100K", {"Control": "Volume"})
-    fp.attributes.do_not_populate = True
-    rows = load_footprints(_make_board([fp]))
+    fp = _make_fp_data("RV1", "B100K", {"Control": "Volume"}, dnp=True)
+    rows = load_footprints(_MockAdapter([fp]))
     assert len(rows) == 1
 
 
 def test_load_footprints_orig_description_captured():
-    fps = [_make_fp("R1", "10k", {"Description": "Original"})]
-    rows = load_footprints(_make_board(fps))
+    fps = [_make_fp_data("R1", "10k", {"Description": "Original"})]
+    rows = load_footprints(_MockAdapter(fps))
     rows[0].description = "Changed"
     assert rows[0].description_changed()
     assert rows[0]._orig_description == "Original"
@@ -141,7 +167,7 @@ def test_load_footprints_orig_description_captured():
 
 
 def test_footprint_row_not_modified_initially():
-    fp = _make_fp("R1", "10k", {"Description": "Resistor"})
+    raw_fp = _make_raw_fp("R1", "10k", {"Description": "Resistor"})
     row = FootprintRow(
         ref="R1",
         value="10k",
@@ -149,7 +175,7 @@ def test_footprint_row_not_modified_initially():
         fp_id="D:G",
         description="Resistor",
         notes="",
-        _fp=fp,
+        _fp=raw_fp,
         _orig_description="Resistor",
         _orig_notes="",
     )
@@ -157,7 +183,7 @@ def test_footprint_row_not_modified_initially():
 
 
 def test_footprint_row_modified_after_description_change():
-    fp = _make_fp("R1", "10k")
+    raw_fp = _make_raw_fp("R1", "10k")
     row = FootprintRow(
         ref="R1",
         value="10k",
@@ -165,7 +191,7 @@ def test_footprint_row_modified_after_description_change():
         fp_id="D:G",
         description="Old",
         notes="",
-        _fp=fp,
+        _fp=raw_fp,
         _orig_description="Old",
         _orig_notes="",
     )
@@ -180,8 +206,8 @@ def test_footprint_row_modified_after_description_change():
 def _make_row(ref, value, orig_desc, new_desc, orig_notes="", new_notes=""):
     desc_field = _make_field("Description", orig_desc)
     notes_field = _make_field("Notes", orig_notes)
-    fp = _make_fp(ref, value)
-    fp.texts_and_fields = [desc_field, notes_field]
+    raw_fp = _make_raw_fp(ref, value)
+    raw_fp.texts_and_fields = [desc_field, notes_field]
     row = FootprintRow(
         ref=ref,
         value=value,
@@ -189,7 +215,7 @@ def _make_row(ref, value, orig_desc, new_desc, orig_notes="", new_notes=""):
         fp_id="D:G",
         description=new_desc,
         notes=new_notes,
-        _fp=fp,
+        _fp=raw_fp,
         _orig_description=orig_desc,
         _orig_notes=orig_notes,
     )

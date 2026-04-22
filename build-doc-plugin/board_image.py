@@ -12,14 +12,12 @@ from reportlab.pdfgen import canvas as rl_canvas
 
 from cli_utils import find_kicad_cli, kicad_env
 from cover_page import _BoardImageSlot
-from footprint_utils import get_board_path
 
 
-def export_board_pdf(board, tmpdir: str, log: Optional[Callable] = None) -> str:
+def export_board_pdf(board_path: str, tmpdir: str, log: Optional[Callable] = None) -> str:
     """Export Edge.Cuts + silkscreen layers as a single-page PDF via kicad-cli."""
     _log = log or (lambda msg: None)
 
-    board_path = get_board_path(board)
     if not board_path or not os.path.exists(board_path):
         raise RuntimeError(f"Board file not found at '{board_path}' — save the board first.")
 

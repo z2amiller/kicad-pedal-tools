@@ -21,7 +21,6 @@ from footprint_utils import (
     check_webview,
     get_board_path,
     get_field,
-    get_fp_id,
     safe_get_footprints,
 )
 from panel_config import FootprintHoleConfig, load_panel_config
@@ -60,7 +59,10 @@ class FootprintRulesDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
         self._board = board
-        self._board_path = get_board_path(board)
+        from kicad_pedal_common.board_adapter import KipyBoardAdapter
+
+        self._adapter = KipyBoardAdapter(board)
+        self._board_path = get_board_path(self._adapter)
         self._plugin_dir = plugin_dir
         self._plugin_json = os.path.join(plugin_dir, "panel_config.json")
 
@@ -144,26 +146,20 @@ class FootprintRulesDialog(wx.Dialog):
         - Back-copper LEDs/diodes — auto-detected by heuristic, but user may
           want to customise their hole size or position via a global rule
         """
-        from kipy.board import BoardLayer
-
         known_ids = set(self._rule_keys)
         seen: Dict[str, _Candidate] = {}
 
-        for fp in safe_get_footprints(self._board):
-            ref = fp.reference_field.text.value
+        for fp_data in safe_get_footprints(self._adapter):
+            ref = fp_data.ref
             if ref.startswith("~") or ref in ("REF**", ""):
                 continue
-            fp_id = get_fp_id(fp)
+            fp_id = fp_data.footprint_id
             if fp_id in known_ids or fp_id in seen:
                 continue
 
-            is_back_led = False
-            try:
-                is_back_led = bool(_LED_RE.match(ref) and fp.layer == BoardLayer.BL_B_Cu)
-            except Exception:
-                pass
+            is_back_led = bool(_LED_RE.match(ref) and fp_data.layer == "B")
 
-            label = get_field(fp, "Control")
+            label = get_field(fp_data, "Control")
 
             if is_back_led:
                 # Include back-copper LEDs even without a Control field
@@ -173,7 +169,7 @@ class FootprintRulesDialog(wx.Dialog):
             # Skip front-copper LEDs and LED library footprints — not panel holes
             if _LED_RE.match(ref):
                 continue
-            if _is_led_footprint(fp):
+            if _is_led_footprint(fp_data):
                 continue
 
             if not label:
@@ -181,9 +177,9 @@ class FootprintRulesDialog(wx.Dialog):
             seen[fp_id] = _Candidate(fp_id=fp_id, refs=[ref], example_label=label)
 
         # Collect multi-instance refs for non-LED footprints
-        for fp in safe_get_footprints(self._board):
-            ref = fp.reference_field.text.value
-            fp_id = get_fp_id(fp)
+        for fp_data in safe_get_footprints(self._adapter):
+            ref = fp_data.ref
+            fp_id = fp_data.footprint_id
             if fp_id not in seen:
                 continue
             if ref not in seen[fp_id].refs:
@@ -427,7 +423,7 @@ class FootprintRulesDialog(wx.Dialog):
             tf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             tf.close()
             generate_enclosure_pdf(
-                board=self._board,
+                adapter=self._adapter,
                 config=preview_cfg,
                 project_name="Preview",
                 author="",

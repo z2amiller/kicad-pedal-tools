@@ -20,6 +20,9 @@ class BuildDocDialog(wx.Dialog):
         w = 820 if self._use_webview else 500
         super().__init__(parent, title=f"Build Document Generator v{_ver}", size=(w, 580))
         self.board = board
+        from kicad_pedal_common.board_adapter import KipyBoardAdapter
+
+        self.adapter = KipyBoardAdapter(board)
         self._preview_path: Optional[str] = None
         self._build_ui()
 
@@ -179,12 +182,12 @@ class BuildDocDialog(wx.Dialog):
             from panel_config import load_panel_config
 
             plugin_dir = os.path.dirname(os.path.abspath(__file__))
-            board_path = get_board_path(self.board)
+            board_path = get_board_path(self.adapter)
             config = load_panel_config(board_path or "", plugin_dir)
             tf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             tf.close()
             generate_enclosure_pdf(
-                board=self.board,
+                adapter=self.adapter,
                 config=config,
                 project_name="Preview",
                 author="",
@@ -277,7 +280,7 @@ class BuildDocDialog(wx.Dialog):
 
         self.txt_log.Clear()
         try:
-            gen = BuildDocGenerator(self.board, params, log=self.log)
+            gen = BuildDocGenerator(self.adapter, params, log=self.log)
             gen.generate()
             self.log(f"Done → {params.output_path}")
             self.btn_cancel.SetLabel("Close")

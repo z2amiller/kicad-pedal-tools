@@ -7,7 +7,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
-from footprint_utils import friendly_footprint_type, get_field, ref_sort_key, safe_get_footprints
+from footprint_utils import friendly_footprint_type, get_field, ref_sort_key
 from pdf_utils import (
     COL_ACCENT,
     COL_HEADER_BG,
@@ -22,7 +22,7 @@ from pdf_utils import (
 
 
 def build_bom_story(
-    board,
+    adapter,
     project_name: str,
     styles,
     log: Optional[Callable] = None,
@@ -57,7 +57,7 @@ def build_bom_story(
     story.append(hr(inner_w))
     story.append(Spacer(1, 0.15 * inch))
 
-    bom = collect_bom(board)
+    bom = collect_bom(adapter.get_footprints())
 
     if not bom:
         story.append(Paragraph("No components found on board.", styles["Normal"]))
@@ -116,40 +116,35 @@ def build_bom_story(
     return story
 
 
-def collect_bom(board) -> List[Dict]:
-    """Extract BOM rows from board footprints.
+def collect_bom(footprints) -> List[Dict]:
+    """Extract BOM rows from a list of FootprintData objects.
 
     Controls (footprints with a Control field) are always included regardless of
     KiCad exclusion flags — they're user-populated parts.  Everything else respects
-    exclude_from_bill_of_materials, exclude_from_position_files, and do_not_populate.
+    exclude_from_bom and do_not_populate.
     Controls sort after regular parts, separated by a thin rule row.
     """
     rows: List[Dict] = []
-    for fp in safe_get_footprints(board):
-        ref = fp.reference_field.text.value
+    for fp_data in footprints:
+        ref = fp_data.ref
         if ref.startswith("~") or ref in ("REF**", ""):
             continue
 
-        control = get_field(fp, "Control")
+        control = get_field(fp_data, "Control")
         location = control if control else ref
 
         if not control:
-            attrs = fp.attributes
-            if (
-                attrs.exclude_from_bill_of_materials
-                or attrs.exclude_from_position_files
-                or attrs.do_not_populate
-            ):
+            if fp_data.exclude_from_bom or fp_data.dnp:
                 continue
 
-        val = fp.value_field.text.value
+        val = fp_data.value
 
-        desc = get_field(fp, "Description")
+        desc = get_field(fp_data, "Description") or fp_data.description
         if not desc:
-            fp_name = fp.definition.id.name
+            fp_name = fp_data.footprint_id.split(":")[-1] if fp_data.footprint_id else ""
             desc = friendly_footprint_type(ref, fp_name)
 
-        notes = get_field(fp, "Notes")
+        notes = get_field(fp_data, "Notes")
 
         rows.append(
             {
