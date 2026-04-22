@@ -1,0 +1,24 @@
+{
+    "identifier": "com.github.z2amiller.builddoc",
+    "type": "plugin",
+    "name": "Build Document Generator",
+    "description": "Generates a PedalPCB-style build document PDF from the current board: cover page with board outline, parts list (BOM), and embedded schematic export.",
+    "description_full": "Produces a multi-page PDF build document styled after PedalPCB project docs. Includes a cover page with the board outline (Edge.Cuts + silkscreen), a formatted parts list pulled from footprint attributes, and optionally the schematic exported via kicad-cli. Python dependencies (reportlab, pypdf, svglib) are bundled in the plugin ZIP.",
+    "author": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "maintainer": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "license": "MIT",
+    "resources": {
+        "homepage": "https://github.com/z2amiller/kicad-build-doc-plugin"
+    },
+    "tags": ["documentation", "bom", "pdf", "pedal", "fabrication"]
+}
