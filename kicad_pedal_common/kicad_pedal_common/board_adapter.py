@@ -40,6 +40,7 @@ class FootprintData:
     rotation: float         # degrees 0-360 CCW
     dnp: bool
     exclude_from_bom: bool
+    description: str = ""   # human-readable component description (optional)
     # Opaque reference to the underlying fp object; not shown in repr.
     _raw: object = field(default=None, repr=False, compare=False)
 
@@ -202,6 +203,19 @@ class KipyBoardAdapter(BoardAdapter):
         except Exception:
             pass
 
+        # Description field — stored in fp.fields alongside Ref/Value
+        description = ""
+        try:
+            for field in fp.fields:  # type: ignore[union-attr]
+                try:
+                    if field.name.lower() == "description":
+                        description = field.text.value or ""
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         return FootprintData(
             ref=ref,
             value=value,
@@ -212,6 +226,7 @@ class KipyBoardAdapter(BoardAdapter):
             rotation=rotation,
             dnp=dnp,
             exclude_from_bom=exclude_from_bom,
+            description=description,
             _raw=fp,
         )
 

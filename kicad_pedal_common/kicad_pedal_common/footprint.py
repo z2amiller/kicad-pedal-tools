@@ -47,6 +47,7 @@ def get_footprints(board) -> List[Dict]:
             "ref": fp.ref,
             "value": fp.value,
             "footprint_id": fp.footprint_id,
+            "description": fp.description,
             "layer": fp.layer,
             "pos_x": fp.pos_x,
             "pos_y": fp.pos_y,

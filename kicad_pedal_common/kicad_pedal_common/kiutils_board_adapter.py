@@ -196,6 +196,8 @@ class KiutilsBoardAdapter(BoardAdapter):
         except Exception:
             pass
 
+        description = self._get_description(fp)
+
         return FootprintData(
             ref=ref,
             value=value,
@@ -206,6 +208,7 @@ class KiutilsBoardAdapter(BoardAdapter):
             rotation=rotation,
             dnp=dnp,
             exclude_from_bom=exclude_from_bom,
+            description=description,
             _raw=fp,
         )
 
@@ -225,6 +228,16 @@ class KiutilsBoardAdapter(BoardAdapter):
                     text = getattr(item, "text", "")
                     if text:
                         return text
+        except Exception:
+            pass
+        return ""
+
+    @staticmethod
+    def _get_description(fp: object) -> str:
+        try:
+            val = fp.properties.get("Description", "")  # type: ignore[union-attr]
+            if val:
+                return val
         except Exception:
             pass
         return ""

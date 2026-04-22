@@ -18,13 +18,14 @@ def _make_bom_entry(
     dnp: bool,
     exclude_from_bom: bool,
     bbox_dict: Dict,
+    description: str = "",
 ) -> Dict:
     """Build a single BOM entry dict matching the manifest bom-entry schema."""
     entry: Dict = {
         "ref": ref,
         "value": value,
         "footprint": footprint_id,
-        "description": "",
+        "description": description,
         "notes": "",
         "layer": layer,
         "pos_x": pos_x,
@@ -87,6 +88,7 @@ def export_bom(board) -> List[Dict]:
                 dnp=fp_dict["dnp"],
                 exclude_from_bom=fp_dict["exclude_from_bom"],
                 bbox_dict=bbox_dict,
+                description=fp_dict.get("description", ""),
             )
         )
 
@@ -129,6 +131,7 @@ def export_bom_from_adapter(adapter) -> List[Dict]:
                 dnp=fp_data.dnp,
                 exclude_from_bom=fp_data.exclude_from_bom,
                 bbox_dict=_bbox(fp_data),
+                description=fp_data.description,
             )
         )
 
