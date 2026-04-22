@@ -31,8 +31,7 @@ class BuildDocDialog(wx.Dialog):
         wx.SafeYield()
 
     def _build_ui(self):
-        board = self.board
-        board_path = get_board_path(board)
+        board_path = self.adapter.get_board_path()
         board_name = os.path.splitext(os.path.basename(board_path))[0] if board_path else "Untitled"
 
         panel = wx.Panel(self)
@@ -108,7 +107,7 @@ class BuildDocDialog(wx.Dialog):
         sch_row.Add(
             wx.StaticText(panel, label="Schematic (.kicad_sch):"), flag=wx.ALIGN_CENTER_VERTICAL
         )
-        board_file = get_board_path(board)
+        board_file = board_path
         board_dir = os.path.dirname(board_file) if board_file else ""
         # Prefer the schematic whose basename matches the board (the project root)
         default_sch = os.path.splitext(board_file)[0] + ".kicad_sch" if board_file else ""
