@@ -63,7 +63,7 @@ echo "Build ZIP"
 echo "Compute archive stats"
 DOWNLOAD_SHA256=$(shasum --algorithm 256 "$ZIP_FILE" | awk '{print $1}')
 DOWNLOAD_SIZE=$(wc -c < "$ZIP_FILE" | tr -d '[:space:]')
-DOWNLOAD_URL="https://github.com/z2amiller/kicad-build-doc-plugin/releases/download/v${VERSION}/kicad-build-doc-plugin-v${VERSION}.zip"
+DOWNLOAD_URL="https://github.com/z2amiller/kicad-pedal-tools/releases/download/build-doc%2Fv${VERSION}/kicad-build-doc-plugin-v${VERSION}.zip"
 INSTALL_SIZE=$(unzip -l "$ZIP_FILE" | awk 'END{print $1}')
 
 echo "Patch metadata.json with real values"
