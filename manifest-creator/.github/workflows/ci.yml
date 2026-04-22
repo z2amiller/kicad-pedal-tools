@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Check out kicad-pedal-common
+        uses: actions/checkout@v4
+        with:
+          repository: z2amiller/kicad-pedal-common
+          path: kicad-pedal-common
+      - name: Vendor kicad-pedal-common
+        run: kicad-pedal-common/scripts/vendor.sh .
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+      - name: Test
+        run: pytest tests/ -v

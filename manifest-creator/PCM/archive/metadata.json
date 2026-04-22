@@ -1,0 +1,34 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "identifier": "com.github.z2amiller.manifest-creator",
+    "type": "plugin",
+    "name": "Manifest Creator",
+    "description": "Export a pedal build manifest (.zip) for use with pedal-build-manager",
+    "description_full": "Generates a .manifest.zip file from the current KiCad board containing SVG layer exports, BOM data, and footprint geometry for use with the Pedal Build Manager interactive assembly guide.",
+    "author": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "maintainer": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "license": "MIT",
+    "resources": {
+        "homepage": "https://github.com/z2amiller/manifest-creator"
+    },
+    "tags": ["bom", "manifest", "pedal", "assembly"],
+    "versions": [{
+        "version": "0.1.1",
+        "status": "stable",
+        "kicad_version": "9.0",
+        "download_sha256": "b8617574f7a1313dba8912cd162ffb381645df06b3caf19d555408c3520c7ea9",
+        "download_size": 28218,
+        "download_url": "https://github.com/z2amiller/manifest-creator/releases/download/v0.1.1/manifest-creator-v0.1.1.zip",
+        "install_size": 60550
+    }]
+}

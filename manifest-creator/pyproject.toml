@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "manifest-creator"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = []   # kicad-pedal-common is vendored, not pip-installed
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["manifest_creator"]
