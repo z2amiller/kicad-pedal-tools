@@ -123,11 +123,16 @@ def _get_requests():
         import requests
         return requests
     except ImportError:
-        print("ERROR: 'requests' package required for --upload-to (pip install requests)", file=sys.stderr)
+        print(
+            "ERROR: 'requests' package required for --upload-to (pip install requests)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
-def _upload(base_url: str, zip_path: str, password: str | None, version: str, log) -> tuple[str, str]:
+def _upload(
+    base_url: str, zip_path: str, password: str | None, version: str, log
+) -> tuple[str, str]:
     """Upload manifest zip. Returns (slug, version) from server response."""
     password = password or os.environ.get("MANIFEST_ADMIN_PASSWORD")
     if not password:
@@ -142,7 +147,9 @@ def _upload(base_url: str, zip_path: str, password: str | None, version: str, lo
     url = base_url.rstrip("/") + "/admin/upload"
     log("Uploading to {}".format(url))
     with open(zip_path, "rb") as f:
-        resp = requests.post(url, auth=("admin", password), files={"file": (zip_path, f, "application/zip")})
+        resp = requests.post(
+            url, auth=("admin", password), files={"file": (zip_path, f, "application/zip")}
+        )
 
     if resp.status_code == 200:
         data = resp.json()
