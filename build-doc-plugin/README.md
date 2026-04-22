@@ -4,6 +4,21 @@ Generates a **Build document PDF** directly from an open KiCad 9+ board. The doc
 
 ---
 
+## ⚠️ Important: enable the KiCad IPC API
+
+The toolbar plugin communicates with KiCad via its IPC API, which is **disabled by default**. Without enabling it the toolbar button will silently do nothing.
+
+**In the KiCad PCB editor:**
+
+1. Open **Preferences → Preferences**
+2. Navigate to **PCB Editor → Scripting** in the left sidebar
+3. Enable **"Allow external plugins to connect via IPC"** (exact label varies between KiCad 9 and 10)
+4. Click **OK** and restart the PCB editor
+
+You only need to do this once per KiCad installation. The CLI (see below) does **not** require this — it reads the board file directly.
+
+---
+
 ## Installation
 
 ### Via KiCad Plugin Manager (recommended)
@@ -50,7 +65,57 @@ subprocess.run([sys.executable, "-m", "pip", "install",
 ***NOTE*** The first launch after you run this plugin can be slow, since it has
 to install these dependencies.
 
-## Basic usage
+## CLI usage (headless)
+
+The plugin can also generate build documents from the command line, without KiCad open. Requires [kiutils](https://github.com/mvnmgrx/kiutils):
+
+```bash
+pip install kiutils reportlab pypdf pillow
+pip install "build-doc @ git+https://github.com/z2amiller/kicad-pedal-tools.git#subdirectory=build-doc-plugin"
+```
+
+Basic usage:
+
+```bash
+python -m build_doc \
+    --board path/to/your-board.kicad_pcb \
+    --out path/to/output.pdf
+```
+
+With metadata:
+
+```bash
+python -m build_doc \
+    --board your-board.kicad_pcb \
+    --out your-board-build-doc.pdf \
+    --name "My Pedal" \
+    --author "Your Name" \
+    --revision "1.0" \
+    --blurb "A short description of the circuit."
+```
+
+**CLI reference:**
+
+| Flag | Description |
+|------|-------------|
+| `--board PATH` | Path to the `.kicad_pcb` file (required) |
+| `--out PATH` | Output PDF path (required) |
+| `--name NAME` | Project name (defaults to board file stem) |
+| `--author AUTHOR` | Author / copyright line |
+| `--revision REV` | Revision string (default: `1.0`) |
+| `--blurb TEXT` | Cover page description text |
+| `--sch PATH` | Path to root `.kicad_sch` (auto-detected if omitted) |
+| `--kicad-cli PATH` | Explicit path to `kicad-cli` (auto-detected if omitted) |
+| `--no-cover` | Omit cover page |
+| `--no-bom` | Omit parts list |
+| `--no-enclosure` | Omit drilling template |
+| `--sch-include` | Include schematic pages (off by default in CLI mode) |
+
+The enclosure drilling template uses the same `panel_config.json` that the IPC plugin uses — place one next to your `.kicad_pcb` file to configure enclosure dimensions and footprint hole rules.
+
+---
+
+## Basic usage (IPC plugin)
 
 1. Open your `.kicad_pcb` file in the PCB Editor
 2. Click the **Build Doc** toolbar button, or go to **Tools → External Plugins → Build Document Generator**

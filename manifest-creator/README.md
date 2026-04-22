@@ -8,6 +8,21 @@ Generating a manifest takes **30–60 seconds** depending on board complexity. M
 
 ---
 
+## ⚠️ Important: enable the KiCad IPC API (plugin mode only)
+
+The toolbar plugin communicates with KiCad via its IPC API, which is **disabled by default**. Without enabling it the toolbar button will silently do nothing.
+
+**In the KiCad PCB editor:**
+
+1. Open **Preferences → Preferences**
+2. Navigate to **PCB Editor → Scripting** in the left sidebar
+3. Enable **"Allow external plugins to connect via IPC"** (exact label varies between KiCad 9 and 10)
+4. Click **OK** and restart the PCB editor
+
+You only need to do this once per KiCad installation. The CLI (Option B below) does **not** require this.
+
+---
+
 ## Installation
 
 ### Option A — KiCad Plugin (GUI)
@@ -22,7 +37,7 @@ Install via KiCad's **Plugin and Content Manager**:
 3. Find **Manifest Creator** in the list and install it.
 
 Or install directly from a release ZIP:
-- Download `manifest-creator-vX.Y.Z.zip` from the [Releases](https://github.com/z2amiller/manifest-creator/releases) page
+- Download `manifest-creator-vX.Y.Z.zip` from the [Releases](https://github.com/z2amiller/kicad-pedal-tools/releases) page
 - KiCad → **Plugin and Content Manager** → **Install from File**
 
 Once installed, the plugin appears as a toolbar button in the PCB editor. Click it, choose a save location, and the export runs with a live progress window.
@@ -34,7 +49,7 @@ Once installed, the plugin appears as a toolbar button in the PCB editor. Click 
 Install into your system or project Python environment:
 
 ```bash
-pip install git+https://github.com/z2amiller/manifest-creator.git
+pip install "manifest-creator @ git+https://github.com/z2amiller/kicad-pedal-tools.git#subdirectory=manifest-creator"
 ```
 
 This also installs `kiutils` for full BOM and footprint geometry export without a running KiCad session.
@@ -91,15 +106,18 @@ python -m manifest_creator \
 
 ## Development
 
-Vendor `kicad-pedal-common` and install dev dependencies:
+This plugin lives in the [`kicad-pedal-tools`](https://github.com/z2amiller/kicad-pedal-tools) monorepo. Clone the full repo and install `kicad_pedal_common` as an editable package:
 
 ```bash
-/path/to/kicad-pedal-common/scripts/vendor.sh .
-pip install -e ".[dev]"
+git clone https://github.com/z2amiller/kicad-pedal-tools.git
+cd kicad-pedal-tools
+pip install -e kicad_pedal_common
+pip install -e manifest-creator
 ```
 
 Run tests:
 
 ```bash
+cd manifest-creator
 pytest tests/ -v
 ```
