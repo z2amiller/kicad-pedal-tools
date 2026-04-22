@@ -1,0 +1,22 @@
+{
+    "$schema": "https://go.kicad.org/api/schemas/v1",
+    "identifier": "com.github.z2amiller.manifest-creator",
+    "name": "Manifest Creator",
+    "description": "Export a pedal build manifest (.zip) for use with pedal-build-manager",
+    "runtime": {
+        "type": "python",
+        "min_version": "3.9"
+    },
+    "actions": [
+        {
+            "identifier": "export-manifest",
+            "name": "Export Manifest",
+            "description": "Export a .manifest.zip containing board SVG layers, BOM, and footprint geometry",
+            "entrypoint": "ipc_plugin_main.py",
+            "show-button": true,
+            "scopes": ["pcb"],
+            "icons-light": ["icon.png"],
+            "icons-dark": ["icon.png"]
+        }
+    ]
+}

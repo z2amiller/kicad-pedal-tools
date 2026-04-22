@@ -1,0 +1,7 @@
+{
+  "pythonVersion": "3.9",
+  "pythonPlatform": "Darwin",
+  "pythonPath": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none"
+}

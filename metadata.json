@@ -1,0 +1,24 @@
+{
+    "identifier": "com.github.z2amiller.manifest-creator",
+    "type": "plugin",
+    "name": "Manifest Creator",
+    "description": "Export a pedal build manifest (.zip) for use with pedal-build-manager",
+    "description_full": "Generates a .manifest.zip file from the current KiCad board containing SVG layer exports, BOM data, and footprint geometry for use with the Pedal Build Manager interactive assembly guide.",
+    "author": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "maintainer": {
+        "name": "Andy Miller",
+        "contact": {
+            "web": "https://z2amiller.com"
+        }
+    },
+    "license": "MIT",
+    "resources": {
+        "homepage": "https://github.com/z2amiller/manifest-creator"
+    },
+    "tags": ["bom", "manifest", "pedal", "assembly"]
+}

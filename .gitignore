@@ -1,0 +1,6 @@
+kicad_pedal_common/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
