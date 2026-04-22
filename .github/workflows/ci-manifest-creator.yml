@@ -1,0 +1,41 @@
+name: CI — manifest-creator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'manifest-creator/**'
+      - 'kicad_pedal_common/**'
+  pull_request:
+    paths:
+      - 'manifest-creator/**'
+      - 'kicad_pedal_common/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dev dependencies
+        run: |
+          cd manifest-creator
+          pip install -e ".[dev]"
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+      - name: Lint
+        run: |
+          cd manifest-creator
+          ruff check .
+      - name: Format check
+        run: |
+          cd manifest-creator
+          ruff format --check .
+      - name: Test
+        run: |
+          cd manifest-creator
+          pytest tests/ -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}

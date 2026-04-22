@@ -1,9 +1,9 @@
-name: Release
+name: Release — build-doc-plugin
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'build-doc/v*'
 
 jobs:
   build:
@@ -12,21 +12,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: manifest-creator
-
-      - uses: actions/checkout@v4
-        with:
-          repository: z2amiller/kicad-pedal-common
-          path: kicad-pedal-common
-
-      - name: Vendor kicad-pedal-common
-        run: bash kicad-pedal-common/scripts/vendor.sh manifest-creator
 
       - name: Build PCM archive
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          bash manifest-creator/PCM/create_pcm_archive.sh "$VERSION"
+          VERSION=${GITHUB_REF_NAME#build-doc/v}
+          bash build-doc-plugin/PCM/create_pcm_archive.sh "$VERSION"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -41,7 +31,7 @@ jobs:
             Or add the self-hosted repository to KiCad PCM:
             `https://raw.githubusercontent.com/z2amiller/kicad-pcm/main/repository.json`
 
-            No separate `pip install` needed — dependencies are bundled.
+            No separate `pip install` needed — dependencies are installed automatically.
 
             **SHA256:** `${{ env.DOWNLOAD_SHA256 }}`
 
@@ -54,7 +44,7 @@ jobs:
           token: ${{ secrets.PCM_REPO_TOKEN }}
           inputs: |
             {
-              "package_id": "com.github.z2amiller.manifest-creator",
+              "package_id": "com.github.z2amiller.builddoc",
               "version": "${{ env.VERSION }}",
               "download_url": "${{ env.DOWNLOAD_URL }}",
               "download_sha256": "${{ env.DOWNLOAD_SHA256 }}",
