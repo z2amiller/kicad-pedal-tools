@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 from kicad_pedal_common.ipc_watchdog import start_kicad_watchdog, wait_for_kicad
 
-
 # ---------------------------------------------------------------------------
 # wait_for_kicad
 # ---------------------------------------------------------------------------
@@ -131,7 +130,7 @@ class TestStartKicadWatchdog:
         kicad.ping.side_effect = _ping
         on_exit = MagicMock()
 
-        thread = start_kicad_watchdog(kicad, on_exit=on_exit, poll_interval_s=0.01)
+        start_kicad_watchdog(kicad, on_exit=on_exit, poll_interval_s=0.01)
         # Give the thread a couple of cycles
         time.sleep(0.1)
         on_exit.assert_not_called()

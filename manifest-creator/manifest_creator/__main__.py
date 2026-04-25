@@ -162,7 +162,12 @@ def _upload(
 
 
 def _upload_pdf(
-    base_url: str, pdf_path: str, password: str | None, slug: str, version: str, log
+    base_url: str,
+    pdf_path: str,
+    password: "str | None",
+    slug: str,
+    version: str,
+    log,
 ) -> None:
     """Upload a PDF build document for an already-uploaded board version."""
     password = password or os.environ.get("MANIFEST_ADMIN_PASSWORD")
