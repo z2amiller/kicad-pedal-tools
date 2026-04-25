@@ -18,7 +18,12 @@ class BuildDocDialog(wx.Dialog):
         _ver = open(_ver_file).read().strip() if os.path.exists(_ver_file) else "dev"
         self._use_webview = check_webview()
         w = 820 if self._use_webview else 500
-        super().__init__(parent, title=f"Build Document Generator v{_ver}", size=(w, 580))
+        super().__init__(
+            parent,
+            title=f"Build Document Generator v{_ver}",
+            size=(w, 640),
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
         self.board = board
         from kicad_pedal_common.board_adapter import KipyBoardAdapter
 
@@ -155,11 +160,11 @@ class BuildDocDialog(wx.Dialog):
         self.txt_log.SetFont(
             wx.Font(9, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         )
-        vbox.Add(self.txt_log, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=12)
+        vbox.Add(self.txt_log, proportion=1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=12)
 
         if self._use_webview:
             root = wx.BoxSizer(wx.HORIZONTAL)
-            root.Add(vbox, proportion=0, flag=wx.EXPAND)
+            root.Add(vbox, proportion=1, flag=wx.EXPAND)
             self._webview = wx.html2.WebView.New(panel, size=(300, -1))
             root.Add(
                 self._webview,

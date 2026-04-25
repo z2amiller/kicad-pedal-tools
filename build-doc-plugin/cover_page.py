@@ -166,13 +166,8 @@ def build_cover_story(
         story.append(Spacer(1, 0.1 * inch))
 
     _log("Extracting controls…")
-<<<<<<< HEAD:build-doc-plugin/cover_page.py
     config = load_panel_config(get_board_path(adapter), plugin_dir, _log)
     controls = extract_controls(adapter, set(config.footprints.keys()), log=_log)
-=======
-    config = load_panel_config(get_board_path(board), plugin_dir, _log)
-    controls = extract_controls(board, set(config.footprints.keys()), log=_log)
->>>>>>> f01dc49 (fix: retry IPC calls on transient failure, robust field access, controls logging):cover_page.py
     external = controls.external
     internal = controls.internal
     _log(f"  Found {len(external)} external, {len(internal)} internal control(s).")
