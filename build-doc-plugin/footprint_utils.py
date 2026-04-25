@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
@@ -35,14 +36,18 @@ class Controls:
     internal: List[ControlEntry]
 
 
-def safe_get_footprints(adapter, log: Optional[Callable] = None) -> List:
-    """Return adapter.get_footprints() as a list, or [] on error."""
-    try:
-        return list(adapter.get_footprints())
-    except Exception as exc:
-        if log:
-            log(f"  Warning: could not retrieve footprints: {exc}")
-        return []
+def safe_get_footprints(adapter, log: Optional[Callable] = None, _retries: int = 3) -> List:
+    """Return adapter.get_footprints() as a list, retrying on transient IPC errors."""
+    for attempt in range(_retries):
+        try:
+            return list(adapter.get_footprints())
+        except Exception as exc:
+            if attempt < _retries - 1:
+                time.sleep(0.3)
+                continue
+            if log:
+                log(f"  Warning: could not retrieve footprints after {_retries} attempts: {exc}")
+    return []
 
 
 def get_board_path(adapter) -> str:
@@ -121,7 +126,9 @@ def _is_led_footprint(fp_data) -> bool:
         return False
 
 
-def extract_controls(adapter, external_ids: set) -> Controls:
+def extract_controls(
+    adapter, external_ids: set, log: Optional[Callable] = None
+) -> Controls:
     """Return Controls with external and internal ControlEntry lists.
 
     External = footprint ID in external_ids; internal = everything else
@@ -131,11 +138,18 @@ def extract_controls(adapter, external_ids: set) -> Controls:
     Internal-only additional exclusions: TP* (test points), single-pad
     footprints, and any footprint whose ref looks like an LED indicator.
     """
+    _log = log or (lambda msg: None)
     external: List[ControlEntry] = []
     internal: List[ControlEntry] = []
     seen: set = set()
 
-    for fp_data in safe_get_footprints(adapter):
+    footprints = safe_get_footprints(adapter, log=log)
+    _log(
+        f"  extract_controls: scanning {len(footprints)} footprint(s), "
+        f"{len(external_ids)} external ID(s)"
+    )
+
+    for fp_data in footprints:
         ref = fp_data.ref
         if ref.startswith("~") or ref in ("REF**", ""):
             continue
@@ -146,11 +160,20 @@ def extract_controls(adapter, external_ids: set) -> Controls:
             continue
         seen.add(label)
 
+        fp_id = fp_data.footprint_id
         entry = ControlEntry(ref=ref, label=label, value=fp_data.value)
-        if fp_data.footprint_id in external_ids:
+        if fp_id in external_ids:
             external.append(entry)
+            _log(f"    external: {ref} ({fp_id}) → {label!r}")
         elif not _EXCLUDE_INTERNAL_RE.match(ref) and fp_data.pad_count > 1:
             internal.append(entry)
+            _log(f"    internal: {ref} ({fp_id}) → {label!r}")
+        else:
+            _log(
+                f"    skipped:  {ref} ({fp_id}) → {label!r} "
+                f"(excluded-internal={bool(_EXCLUDE_INTERNAL_RE.match(ref))}, "
+                f"single-pad={fp_data.pad_count <= 1})"
+            )
 
     external.sort(key=lambda c: ref_sort_key(c.ref))
     internal.sort(key=lambda c: ref_sort_key(c.ref))
