@@ -161,7 +161,9 @@ def _upload(
         sys.exit(1)
 
 
-def _upload_pdf(base_url: str, pdf_path: str, password: str | None, slug: str, version: str, log) -> None:
+def _upload_pdf(
+    base_url: str, pdf_path: str, password: str | None, slug: str, version: str, log
+) -> None:
     """Upload a PDF build document for an already-uploaded board version."""
     password = password or os.environ.get("MANIFEST_ADMIN_PASSWORD")
     if not password:
@@ -176,12 +178,23 @@ def _upload_pdf(base_url: str, pdf_path: str, password: str | None, slug: str, v
     url = "{}/admin/upload-pdf?slug={}&version={}".format(base_url.rstrip("/"), slug, version)
     log("Uploading PDF to {}".format(url))
     with open(pdf_path, "rb") as f:
-        resp = requests.post(url, auth=("admin", password), files={"file": (pdf_path, f, "application/pdf")})
+        resp = requests.post(
+            url,
+            auth=("admin", password),
+            files={"file": (pdf_path, f, "application/pdf")},
+        )
 
     if resp.status_code == 200:
-        print("PDF uploaded: {}/board/{}/{}/build-doc.pdf".format(base_url.rstrip("/"), slug, version))
+        print(
+            "PDF uploaded: {}/board/{}/{}/build-doc.pdf".format(
+                base_url.rstrip("/"), slug, version
+            )
+        )
     else:
-        print("ERROR: PDF upload failed ({}) — {}".format(resp.status_code, resp.text), file=sys.stderr)
+        print(
+            "ERROR: PDF upload failed ({}) — {}".format(resp.status_code, resp.text),
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

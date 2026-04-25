@@ -34,8 +34,8 @@ def main() -> int:
         return 1
 
     try:
-        from kipy import KiCad
         from kicad_pedal_common.ipc_watchdog import wait_for_kicad
+        from kipy import KiCad
 
         kicad = KiCad(socket_path=socket_path, kicad_token=token)
 

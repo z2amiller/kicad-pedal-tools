@@ -33,8 +33,9 @@ def adapter():
 def manifest_zip(tmp_path_factory):
     """Run the full CLI export once per session and return the ZIP path."""
     out = str(tmp_path_factory.mktemp("manifest") / "test.manifest.zip")
-    from manifest_creator.packager import create_manifest_zip
     from kicad_pedal_common.kiutils_board_adapter import KiutilsBoardAdapter
+
+    from manifest_creator.packager import create_manifest_zip
 
     a = KiutilsBoardAdapter(BOARD_PATH)
     create_manifest_zip(
