@@ -305,10 +305,11 @@ class KipyBoardAdapter(BoardAdapter):
         except Exception:
             pass
 
-        # Pad count
+        # Pad count — use fp.definition.pads (the footprint template's pad list),
+        # not fp.pads (instance-level overrides that are often empty in kipy).
         pad_count = 0
         try:
-            pad_count = len(fp.pads)  # type: ignore[union-attr]
+            pad_count = len(list(fp.definition.pads))  # type: ignore[union-attr]
         except Exception:
             pass
 
