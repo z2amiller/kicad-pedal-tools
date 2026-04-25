@@ -21,7 +21,7 @@ def _make_fp(
     value="10K",
     library="Resistor_THT",
     fp_name="R_Axial",
-    layer=0,           # 0 = front copper, 31 = back copper
+    layer=0,  # 0 = front copper, 31 = back copper
     pos_x_nm=10_000_000,
     pos_y_nm=20_000_000,
     rotation_rad=0.0,

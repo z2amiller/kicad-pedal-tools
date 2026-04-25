@@ -33,14 +33,14 @@ class FootprintData:
 
     ref: str
     value: str
-    footprint_id: str       # "LibName:FpName"
-    layer: str              # "F" or "B"
-    pos_x: float            # mm
-    pos_y: float            # mm
-    rotation: float         # degrees 0-360 CCW
+    footprint_id: str  # "LibName:FpName"
+    layer: str  # "F" or "B"
+    pos_x: float  # mm
+    pos_y: float  # mm
+    rotation: float  # degrees 0-360 CCW
     dnp: bool
     exclude_from_bom: bool
-    description: str = ""   # human-readable component description (optional)
+    description: str = ""  # human-readable component description (optional)
     fields: Dict[str, str] = field(default_factory=dict)  # custom KiCad fields, lowercase keys
     pad_count: int = 0
     # Opaque reference to the underlying fp object; not shown in repr.
@@ -76,9 +76,7 @@ class BoardAdapter:
         """Return all footprints on the board as a list of :class:`FootprintData`."""
         raise NotImplementedError
 
-    def get_item_bounding_box(
-        self, fp_data: FootprintData
-    ) -> Optional[BBoxCenter]:
+    def get_item_bounding_box(self, fp_data: FootprintData) -> Optional[BBoxCenter]:
         """Return the bounding-box centre for *fp_data*, or None if unavailable."""
         raise NotImplementedError
 
@@ -134,9 +132,7 @@ class KipyBoardAdapter(BoardAdapter):
 
         return result
 
-    def get_item_bounding_box(
-        self, fp_data: FootprintData
-    ) -> Optional[BBoxCenter]:
+    def get_item_bounding_box(self, fp_data: FootprintData) -> Optional[BBoxCenter]:
         """Return the bounding-box centre in mm, or None if unavailable."""
         if fp_data._raw is None:
             return None
@@ -160,6 +156,7 @@ class KipyBoardAdapter(BoardAdapter):
 
     def get_board_path(self) -> str:
         import os
+
         board = self._board
         try:
             name = board.name
@@ -180,10 +177,8 @@ class KipyBoardAdapter(BoardAdapter):
     def get_board_bounding_box(self) -> Optional[Tuple[float, float, float, float]]:
         try:
             from kipy.board import BoardLayer  # type: ignore[import]
-            shapes = [
-                s for s in self._board.get_shapes()
-                if s.layer == BoardLayer.BL_Edge_Cuts
-            ]
+
+            shapes = [s for s in self._board.get_shapes() if s.layer == BoardLayer.BL_Edge_Cuts]
             if not shapes:
                 return None
             bboxes = self._board.get_item_bounding_box(shapes)
@@ -242,7 +237,7 @@ class KipyBoardAdapter(BoardAdapter):
         try:
             fp_id = "{}:{}".format(
                 fp.definition.id.library,  # type: ignore[union-attr]
-                fp.definition.id.name,     # type: ignore[union-attr]
+                fp.definition.id.name,  # type: ignore[union-attr]
             )
         except Exception:
             fp_id = ""
@@ -296,9 +291,7 @@ class KipyBoardAdapter(BoardAdapter):
                 if item_name:
                     text_val = ""
                     try:
-                        text_val = str(
-                            getattr(getattr(item, "text", None), "value", "")
-                        ).strip()
+                        text_val = str(getattr(getattr(item, "text", None), "value", "")).strip()
                     except Exception:
                         pass
                     fields[item_name.lower()] = text_val

@@ -6,6 +6,7 @@ Usage:
 Generates a PDF build document from a .kicad_pcb file without a live KiCad session.
 Requires kiutils (pip install kiutils) for headless board parsing.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,11 +22,11 @@ def main(argv=None):
     parser.add_argument(
         "--board", required=True, metavar="PATH", help="Path to the .kicad_pcb file"
     )
+    parser.add_argument("--out", required=True, metavar="PATH", help="Output path for the PDF")
     parser.add_argument(
-        "--out", required=True, metavar="PATH", help="Output path for the PDF"
-    )
-    parser.add_argument(
-        "--name", default=None, metavar="NAME",
+        "--name",
+        default=None,
+        metavar="NAME",
         help="Project name (defaults to board file stem)",
     )
     parser.add_argument(
@@ -35,15 +36,21 @@ def main(argv=None):
         "--revision", default="1.0", metavar="REV", help="Revision string (default: 1.0)"
     )
     parser.add_argument(
-        "--blurb", default="", metavar="TEXT",
+        "--blurb",
+        default="",
+        metavar="TEXT",
         help="Optional description text for the cover page",
     )
     parser.add_argument(
-        "--sch", default="", metavar="PATH",
+        "--sch",
+        default="",
+        metavar="PATH",
         help="Path to root .kicad_sch (auto-detected if omitted)",
     )
     parser.add_argument(
-        "--kicad-cli", default=None, metavar="PATH",
+        "--kicad-cli",
+        default=None,
+        metavar="PATH",
         help="Explicit path to kicad-cli (auto-detected if omitted)",
     )
     parser.add_argument("--no-cover", action="store_true", help="Omit cover page")
@@ -52,7 +59,8 @@ def main(argv=None):
         "--no-enclosure", action="store_true", help="Omit enclosure drilling template"
     )
     parser.add_argument(
-        "--sch-include", action="store_true",
+        "--sch-include",
+        action="store_true",
         help="Include schematic pages (off by default in CLI mode)",
     )
     args = parser.parse_args(argv)

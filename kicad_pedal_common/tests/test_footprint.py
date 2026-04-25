@@ -293,8 +293,8 @@ class TestGetFootprintBboxCenterOffset:
             pos_x_nm=0,
             pos_y_nm=0,
             rotation_rad=math.pi / 2,
-            bbox_center_x_nm=3_000_000,   # 3 mm in board X
-            bbox_center_y_nm=4_000_000,   # 4 mm in board Y
+            bbox_center_x_nm=3_000_000,  # 3 mm in board X
+            bbox_center_y_nm=4_000_000,  # 4 mm in board Y
         )
         cx, cy = get_footprint_bbox_center_offset(board, fp)
         assert cx == pytest.approx(-4.0), "un-rotation cx wrong — check -rot vs +rot"
@@ -312,7 +312,6 @@ class TestGetFootprintBboxCenterOffset:
         cx, cy = get_footprint_bbox_center_offset(board, fp)
         assert cx == pytest.approx(-3.0)
         assert cy == pytest.approx(-4.0)
-
 
     def test_exception_returns_none(self):
         board = MagicMock()

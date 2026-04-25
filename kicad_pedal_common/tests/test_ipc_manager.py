@@ -23,9 +23,17 @@ def _make_manager(**kwargs) -> KiCadIPCManager:
 
 def _make_fp(**kwargs) -> FootprintData:
     defaults = dict(
-        ref="R1", value="10k", footprint_id="Device:R", layer="F",
-        pos_x=0.0, pos_y=0.0, rotation=0.0, dnp=False,
-        exclude_from_bom=False, fields={}, pad_count=2,
+        ref="R1",
+        value="10k",
+        footprint_id="Device:R",
+        layer="F",
+        pos_x=0.0,
+        pos_y=0.0,
+        rotation=0.0,
+        dnp=False,
+        exclude_from_bom=False,
+        fields={},
+        pad_count=2,
     )
     defaults.update(kwargs)
     return FootprintData(**defaults)
@@ -45,6 +53,7 @@ class TestKiCadIPCManager:
 
     def test_submit_propagates_exception_after_retries(self):
         calls = []
+
         def _fail():
             calls.append(1)
             raise ValueError("boom")
@@ -61,6 +70,7 @@ class TestKiCadIPCManager:
 
     def test_submit_retries_then_succeeds(self):
         call_count = [0]
+
         def _flaky():
             call_count[0] += 1
             if call_count[0] < 3:
@@ -162,7 +172,7 @@ class TestKiCadIPCManager:
 
         mgr = KiCadIPCManager(
             ping_fn=_dead_ping,
-            max_retries=3,   # board ops retry 3×; ping must override to 1
+            max_retries=3,  # board ops retry 3×; ping must override to 1
             retry_delay_s=1.0,  # if retry happened, test would be very slow
         )
         with pytest.raises(ConnectionRefusedError):
@@ -179,9 +189,7 @@ class TestKiCadIPCManager:
             call_count[0] += 1
             raise ValueError("nope")
 
-        mgr = KiCadIPCManager(
-            ping_fn=None, max_retries=5, retry_delay_s=0.0
-        )
+        mgr = KiCadIPCManager(ping_fn=None, max_retries=5, retry_delay_s=0.0)
         with pytest.raises(ValueError):
             mgr.submit(_fail, _retries=2)
         assert call_count[0] == 2
@@ -261,9 +269,7 @@ class TestSerializedBoardAdapter:
         adapter, inner, mgr = self._make_adapter()
         inner.get_footprints.side_effect = RuntimeError("ipc dead")
 
-        mgr2 = KiCadIPCManager(
-            ping_fn=None, max_retries=1, retry_delay_s=0.0
-        )
+        mgr2 = KiCadIPCManager(ping_fn=None, max_retries=1, retry_delay_s=0.0)
         adapter2 = SerializedBoardAdapter(inner, mgr2)
         with pytest.raises(RuntimeError, match="ipc dead"):
             adapter2.get_footprints()

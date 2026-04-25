@@ -126,9 +126,7 @@ def _is_led_footprint(fp_data) -> bool:
         return False
 
 
-def extract_controls(
-    adapter, external_ids: set, log: Optional[Callable] = None
-) -> Controls:
+def extract_controls(adapter, external_ids: set, log: Optional[Callable] = None) -> Controls:
     """Return Controls with external and internal ControlEntry lists.
 
     External = footprint ID in external_ids; internal = everything else

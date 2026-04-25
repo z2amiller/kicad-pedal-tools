@@ -91,9 +91,7 @@ def test_centroid_rotated_90():
 
 def test_centroid_b_cu_same_as_f_cu():
     # B.Cu footprints: pad positions are absolute PCB coords just like F.Cu.
-    fp_data = _make_fp_data_with_raw(
-        0, 0, [_make_pad(0, 0), _make_pad(2_540_000, 0)], layer="B"
-    )
+    fp_data = _make_fp_data_with_raw(0, 0, [_make_pad(0, 0), _make_pad(2_540_000, 0)], layer="B")
     adapter = KipyBoardAdapter(_make_mock_board())
     dx, dy = adapter.get_pad_centroid_offset(fp_data)
     assert abs(dx - 1.27) < 1e-6

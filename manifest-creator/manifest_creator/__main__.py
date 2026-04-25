@@ -68,9 +68,7 @@ def main(argv=None):
         "--password",
         default=None,
         metavar="PASSWORD",
-        help=(
-            "Admin password for --upload-to (falls back to MANIFEST_ADMIN_PASSWORD env var)"
-        ),
+        help=("Admin password for --upload-to (falls back to MANIFEST_ADMIN_PASSWORD env var)"),
     )
     parser.add_argument(
         "--pdf",
@@ -87,6 +85,7 @@ def main(argv=None):
     _adapter = None
     try:
         from kicad_pedal_common.kiutils_board_adapter import KiutilsBoardAdapter
+
         _adapter = KiutilsBoardAdapter(args.board)
         _log("Using kiutils adapter for full BOM export")
     except ImportError:
@@ -121,6 +120,7 @@ def main(argv=None):
 def _get_requests():
     try:
         import requests
+
         return requests
     except ImportError:
         print(
@@ -191,9 +191,7 @@ def _upload_pdf(
 
     if resp.status_code == 200:
         print(
-            "PDF uploaded: {}/board/{}/{}/build-doc.pdf".format(
-                base_url.rstrip("/"), slug, version
-            )
+            "PDF uploaded: {}/board/{}/{}/build-doc.pdf".format(base_url.rstrip("/"), slug, version)
         )
     else:
         print(

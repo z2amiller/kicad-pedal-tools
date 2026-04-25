@@ -58,9 +58,7 @@ class KiutilsBoardAdapter(BoardAdapter):
             pass
         return result
 
-    def get_item_bounding_box(
-        self, fp_data: FootprintData
-    ) -> Optional[BBoxCenter]:
+    def get_item_bounding_box(self, fp_data: FootprintData) -> Optional[BBoxCenter]:
         """Derive bounding-box centre from full footprint geometry.
 
         Uses all graphicItems (silkscreen lines, fab outlines, circles) plus

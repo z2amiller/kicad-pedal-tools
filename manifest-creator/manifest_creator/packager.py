@@ -170,9 +170,7 @@ def create_manifest_zip(
                 seen_fp_ids = set()
                 for fp in board.get_footprints():
                     try:
-                        fp_id = "{}:{}".format(
-                            fp.definition.id.library, fp.definition.id.name
-                        )
+                        fp_id = "{}:{}".format(fp.definition.id.library, fp.definition.id.name)
                     except Exception:
                         continue
                     if fp_id in seen_fp_ids:
@@ -189,7 +187,11 @@ def create_manifest_zip(
         if board is not None or adapter is not None:
             try:
                 fp_svgs = export_footprint_svgs(
-                    board, board_path, tmp_dir, kicad_cli=kicad_cli, log=log,
+                    board,
+                    board_path,
+                    tmp_dir,
+                    kicad_cli=kicad_cli,
+                    log=log,
                     bbox_offsets=bbox_offsets if bbox_offsets else None,
                     adapter=adapter,
                 )
@@ -220,9 +222,7 @@ def create_manifest_zip(
         _log("Computing coordinate transform from edge cuts…")
         pcb_bbox = parse_kicad_pcb_edge_cuts_bbox(board_path)
         edge_cuts_zip = layers_map.get("edge_cuts")
-        edge_cuts_abs = (
-            str(pathlib.Path(tmp_dir) / edge_cuts_zip) if edge_cuts_zip else None
-        )
+        edge_cuts_abs = str(pathlib.Path(tmp_dir) / edge_cuts_zip) if edge_cuts_zip else None
 
         if pcb_bbox is not None and edge_cuts_abs and os.path.exists(edge_cuts_abs):
             transform = compute_svg_transform(board_path, edge_cuts_abs)
@@ -275,14 +275,16 @@ def create_manifest_zip(
             try:
                 raw_holes = adapter.get_drill_holes()
                 for h in raw_holes:
-                    drill_holes.append({
-                        "x_mm": round(h.x_mm - pcb_min_x, 4),
-                        "y_mm": round(h.y_mm - pcb_min_y, 4),
-                        "diameter_mm": h.diameter_mm,
-                        "label": h.label,
-                        "plated": h.plated,
-                        "oval": h.oval,
-                    })
+                    drill_holes.append(
+                        {
+                            "x_mm": round(h.x_mm - pcb_min_x, 4),
+                            "y_mm": round(h.y_mm - pcb_min_y, 4),
+                            "diameter_mm": h.diameter_mm,
+                            "label": h.label,
+                            "plated": h.plated,
+                            "oval": h.oval,
+                        }
+                    )
                 _log("Collected {} PCB drill holes.".format(len(drill_holes)))
             except Exception as exc:
                 _log("WARNING: drill hole extraction failed: {}".format(exc))

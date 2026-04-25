@@ -60,9 +60,9 @@ _SI_SUFFIXES: Dict[str, float] = {
     "p": 1e-12,
     "P": 1e-12,  # uppercase pico (KiCad variant)
     "n": 1e-9,
-    "N": 1e-9,   # uppercase nano (KiCad variant)
+    "N": 1e-9,  # uppercase nano (KiCad variant)
     "u": 1e-6,
-    "U": 1e-6,   # uppercase micro (KiCad variant)
+    "U": 1e-6,  # uppercase micro (KiCad variant)
     "m": 1e-3,
     "k": 1e3,
     "K": 1e3,

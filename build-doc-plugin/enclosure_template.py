@@ -259,8 +259,7 @@ class _EnclosureRenderer:
             log(
                 f"    {label}: ref ({rx:.2f}, {ry:.2f})"
                 f"  offset ({cfg.offset_x:+.1f}, {cfg.offset_y:+.1f})"
-                f"  hole ({ex:.2f}, {ey:.2f}) mm"
-                + (" [centroid]" if cfg.use_pad_centroid else "")
+                f"  hole ({ex:.2f}, {ey:.2f}) mm" + (" [centroid]" if cfg.use_pad_centroid else "")
             )
 
     def draw_led_holes(self, adapter, fp_config: Dict, log) -> None:

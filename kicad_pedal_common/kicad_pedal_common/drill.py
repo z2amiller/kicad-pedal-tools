@@ -22,9 +22,9 @@ class DrillHole:
     x_mm: float
     y_mm: float
     diameter_mm: float
-    label: str = ""          # typically the footprint reference
-    plated: bool = True      # False = NPTH (mounting holes, slots)
-    oval: bool = False       # True = slot drill; diameter_mm is the long axis
+    label: str = ""  # typically the footprint reference
+    plated: bool = True  # False = NPTH (mounting holes, slots)
+    oval: bool = False  # True = slot drill; diameter_mm is the long axis
 
 
 def get_drill_holes_kiutils(board: object) -> List[DrillHole]:
@@ -82,14 +82,16 @@ def get_drill_holes_kiutils(board: object) -> List[DrillHole]:
                 bx = fp_x + lx * cos_a - ly * sin_a
                 by = fp_y + lx * sin_a + ly * cos_a
 
-                holes.append(DrillHole(
-                    x_mm=round(bx, 4),
-                    y_mm=round(by, 4),
-                    diameter_mm=round(diameter, 4),
-                    label=ref,
-                    plated=plated,
-                    oval=is_oval,
-                ))
+                holes.append(
+                    DrillHole(
+                        x_mm=round(bx, 4),
+                        y_mm=round(by, 4),
+                        diameter_mm=round(diameter, 4),
+                        label=ref,
+                        plated=plated,
+                        oval=is_oval,
+                    )
+                )
             except Exception:
                 continue
 

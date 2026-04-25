@@ -86,6 +86,7 @@ class TestStartKicadWatchdog:
         kipy.errors.ConnectionError is NOT a subclass of OSError — it must be
         caught explicitly or the watchdog silently ignores the disconnect.
         """
+
         # Create a fake KiPyConnectionError that is NOT an OSError subclass,
         # mirroring the real kipy.errors.ConnectionError hierarchy.
         class FakeKiPyConnectionError(Exception):
@@ -97,6 +98,7 @@ class TestStartKicadWatchdog:
 
         # Patch _kipy_disconnect_exceptions to return our fake class.
         import kicad_pedal_common.ipc_watchdog as _wd
+
         original = _wd._kipy_disconnect_exceptions
 
         def _patched():

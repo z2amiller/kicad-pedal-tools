@@ -29,6 +29,7 @@ class BuildDocDialog(wx.Dialog):
             self.adapter = adapter
         else:
             from kicad_pedal_common.board_adapter import KipyBoardAdapter
+
             self.adapter = KipyBoardAdapter(board)
         self._preview_path: Optional[str] = None
         self._build_ui()

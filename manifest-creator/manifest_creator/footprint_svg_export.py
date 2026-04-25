@@ -36,7 +36,7 @@ def _parse_svg_pad_centers(svg_path: str) -> List[Tuple[float, float]]:
         results: List[Tuple[float, float]] = []
 
         # Round drills (circles are unambiguous — keep as-is)
-        for m in re.finditer(r'<circle\b[^>]*>', data):
+        for m in re.finditer(r"<circle\b[^>]*>", data):
             tag = m.group(0)
             cx_m = re.search(r'\bcx="([^"]+)"', tag)
             cy_m = re.search(r'\bcy="([^"]+)"', tag)
@@ -49,20 +49,20 @@ def _parse_svg_pad_centers(svg_path: str) -> List[Tuple[float, float]]:
         in_white_group = False
         group_depth = 0
         white_entry_depth: Optional[int] = None
-        for tok in re.split(r'(<[^>]+>)', data):
-            if not tok.startswith('<'):
+        for tok in re.split(r"(<[^>]+>)", data):
+            if not tok.startswith("<"):
                 continue
-            if re.match(r'<g\b', tok):
+            if re.match(r"<g\b", tok):
                 group_depth += 1
-                if re.search(r'stroke:#FFFFFF', tok):
+                if re.search(r"stroke:#FFFFFF", tok):
                     in_white_group = True
                     white_entry_depth = group_depth
-            elif tok.startswith('</g'):
+            elif tok.startswith("</g"):
                 if in_white_group and group_depth == white_entry_depth:
                     in_white_group = False
                     white_entry_depth = None
                 group_depth -= 1
-            elif in_white_group and re.match(r'<path\b', tok):
+            elif in_white_group and re.match(r"<path\b", tok):
                 m = re.search(
                     r'd="M\s*([-\d.]+)\s+([-\d.]+)\s*\n?L\s*([-\d.]+)\s+([-\d.]+)\s*\n?"',
                     tok,
@@ -147,6 +147,7 @@ def _pads_from_kicad_mod(lib_path: str, fp_name: str) -> List[Tuple[float, float
     mod_path = os.path.join(lib_path, fp_name + ".kicad_mod")
     try:
         from kiutils.footprint import Footprint as _Fp
+
         fp = _Fp.from_file(mod_path)
         return [(float(p.position.X), float(p.position.Y)) for p in fp.pads]
     except Exception:
@@ -156,7 +157,7 @@ def _pads_from_kicad_mod(lib_path: str, fp_name: str) -> List[Tuple[float, float
         with open(mod_path, encoding="utf-8") as fh:
             data = fh.read()
         pads = []
-        for m in re.finditer(r'\(pad\b[^(]*\(at\s+([-\d.]+)\s+([-\d.]+)', data):
+        for m in re.finditer(r"\(pad\b[^(]*\(at\s+([-\d.]+)\s+([-\d.]+)", data):
             pads.append((float(m.group(1)), float(m.group(2))))
         return pads
     except Exception:
@@ -217,9 +218,11 @@ def export_footprint_svgs(
 
     result: Dict[str, Dict] = {}
     unique_ids = sorted(seen)
-    _log("Exporting SVGs for {} unique footprint types ({} total placements)".format(
-        len(unique_ids), len(fp_dicts)
-    ))
+    _log(
+        "Exporting SVGs for {} unique footprint types ({} total placements)".format(
+            len(unique_ids), len(fp_dicts)
+        )
+    )
 
     for idx, fp_id in enumerate(unique_ids, 1):
         if ":" not in fp_id:
@@ -276,9 +279,7 @@ def export_footprint_svgs(
         fab_abs = os.path.join(fp_out_dir, "fab.svg")
         fab_zip = None
         try:
-            export_footprint_svg(
-                lib_path, fp_name, "F.Fab", fab_abs, kicad_cli=kicad_cli
-            )
+            export_footprint_svg(lib_path, fp_name, "F.Fab", fab_abs, kicad_cli=kicad_cli)
             fab_zip = "fp/{}/fab.svg".format(safe)
         except Exception as exc:
             _log("WARNING: fab SVG failed for {}: {}".format(fp_id, exc))

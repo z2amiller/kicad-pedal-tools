@@ -169,7 +169,7 @@ def _run(board, kicad) -> int:
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
 
-    log_dlg.ShowModal()   # runs wx event loop; CallAfter callbacks fire here
+    log_dlg.ShowModal()  # runs wx event loop; CallAfter callbacks fire here
     log_dlg.Destroy()
 
     manager.shutdown()

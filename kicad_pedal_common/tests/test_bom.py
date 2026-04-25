@@ -135,7 +135,12 @@ class TestHumanizedValueKey:
         # Full ascending order: 100pF, 1nF, 100nF, 1uF, 10uF, 100uF
         caps = ["10uF", "1nF", "100pF", "100uF", "100nF", "1uF"]
         assert sorted(caps, key=humanized_value_key) == [
-            "100pF", "1nF", "100nF", "1uF", "10uF", "100uF"
+            "100pF",
+            "1nF",
+            "100nF",
+            "1uF",
+            "10uF",
+            "100uF",
         ]
 
     def test_r_suffix_ohms(self):
@@ -167,7 +172,12 @@ class TestHumanizedValueKey:
         # Uppercase SI suffix variants sort in same order as lowercase
         caps = ["10UF", "1NF", "100PF", "100UF", "100NF", "1UF"]
         assert sorted(caps, key=humanized_value_key) == [
-            "100PF", "1NF", "100NF", "1UF", "10UF", "100UF"
+            "100PF",
+            "1NF",
+            "100NF",
+            "1UF",
+            "10UF",
+            "100UF",
         ]
 
 

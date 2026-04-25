@@ -77,9 +77,7 @@ class KiCadIPCManager:
         self._retry_delay = retry_delay_s
         self._call_timeout = call_timeout_s
         self._queue: queue.Queue = queue.Queue()
-        self._thread = threading.Thread(
-            target=self._worker, name="kicad-ipc", daemon=True
-        )
+        self._thread = threading.Thread(target=self._worker, name="kicad-ipc", daemon=True)
         self._thread.start()
 
     # ------------------------------------------------------------------
@@ -115,9 +113,7 @@ class KiCadIPCManager:
         holder: List[Any] = [None, None, retries]  # [result, exception, retries]
         self._queue.put((fn, args, kwargs, evt, holder))
         if not evt.wait(self._call_timeout):
-            raise TimeoutError(
-                f"KiCad IPC call timed out after {self._call_timeout:.0f}s"
-            )
+            raise TimeoutError(f"KiCad IPC call timed out after {self._call_timeout:.0f}s")
         exc = holder[1]
         if exc is not None:
             raise exc
@@ -208,9 +204,7 @@ class SerializedBoardAdapter(BoardAdapter):
     def get_footprints(self) -> list:
         return self._mgr.submit(self._inner.get_footprints)
 
-    def get_item_bounding_box(
-        self, fp_data: FootprintData
-    ) -> Optional[BBoxCenter]:
+    def get_item_bounding_box(self, fp_data: FootprintData) -> Optional[BBoxCenter]:
         return self._mgr.submit(self._inner.get_item_bounding_box, fp_data)
 
     def get_drill_holes(self) -> list:
@@ -224,8 +218,6 @@ class SerializedBoardAdapter(BoardAdapter):
     def get_board_path(self) -> str:
         return self._inner.get_board_path()
 
-    def get_pad_centroid_offset(
-        self, fp_data: FootprintData
-    ) -> Tuple[float, float]:
+    def get_pad_centroid_offset(self, fp_data: FootprintData) -> Tuple[float, float]:
         # Accesses already-fetched protobuf fields — no live IPC call.
         return self._inner.get_pad_centroid_offset(fp_data)

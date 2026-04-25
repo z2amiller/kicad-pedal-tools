@@ -25,6 +25,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def adapter():
     from kicad_pedal_common.kiutils_board_adapter import KiutilsBoardAdapter
+
     return KiutilsBoardAdapter(BOARD_PATH)
 
 

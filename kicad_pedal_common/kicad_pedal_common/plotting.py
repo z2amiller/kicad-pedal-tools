@@ -272,7 +272,7 @@ def _lookup_lib_in_table(table_path: str, nickname: str) -> Optional[str]:
                 if depth == 0:
                     end = i + 1
                     break
-        body = content[m.start():end]
+        body = content[m.start() : end]
         name_m = name_pat.search(body)
         uri_m = uri_pat.search(body)
         if name_m and uri_m and name_m.group(1) == nickname:
@@ -376,12 +376,8 @@ def parse_kicad_pcb_edge_cuts_bbox(
     xs: List[float] = []
     ys: List[float] = []
 
-    _COORD_RE = re.compile(
-        r'\((start|end|mid|center)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\)'
-    )
-    _PRIM_START = re.compile(
-        r'\((gr_line|gr_arc|gr_rect|gr_circle|gr_poly|segment|arc)\b'
-    )
+    _COORD_RE = re.compile(r"\((start|end|mid|center)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\)")
+    _PRIM_START = re.compile(r"\((gr_line|gr_arc|gr_rect|gr_circle|gr_poly|segment|arc)\b")
 
     for m in _PRIM_START.finditer(content):
         # Walk forward counting parens to find the end of this block.
