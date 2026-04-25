@@ -77,8 +77,8 @@ def main() -> int:
         return 1
 
     try:
-        from kipy import KiCad
         from kicad_pedal_common.ipc_watchdog import wait_for_kicad
+        from kipy import KiCad
 
         kicad = KiCad(socket_path=socket_path, kicad_token=token)
 
@@ -113,11 +113,11 @@ def main() -> int:
     manager = None
     try:
         import wx
-
-        from build_doc_dialog import BuildDocDialog
         from kicad_pedal_common.board_adapter import KipyBoardAdapter
         from kicad_pedal_common.ipc_manager import KiCadIPCManager, SerializedBoardAdapter
         from kicad_pedal_common.ipc_watchdog import start_kicad_watchdog
+
+        from build_doc_dialog import BuildDocDialog
 
         # All kipy calls go through a single worker thread — the pynng Req0
         # socket is not thread-safe and KiCad serializes requests on its UI

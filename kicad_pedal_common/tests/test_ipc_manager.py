@@ -8,9 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from kicad_pedal_common.ipc_manager import KiCadIPCManager, SerializedBoardAdapter
 from kicad_pedal_common.board_adapter import BoardAdapter, FootprintData
-
+from kicad_pedal_common.ipc_manager import KiCadIPCManager, SerializedBoardAdapter
 
 # ---------------------------------------------------------------------------
 # Helpers

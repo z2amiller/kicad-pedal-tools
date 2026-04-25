@@ -162,7 +162,12 @@ class BuildDocDialog(wx.Dialog):
         self.txt_log.SetFont(
             wx.Font(9, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         )
-        vbox.Add(self.txt_log, proportion=1, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=12)
+        vbox.Add(
+            self.txt_log,
+            proportion=1,
+            flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            border=12,
+        )
 
         if self._use_webview:
             root = wx.BoxSizer(wx.HORIZONTAL)

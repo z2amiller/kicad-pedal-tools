@@ -11,7 +11,6 @@ from kicad_pedal_common.board_adapter import (
     KipyBoardAdapter,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — mirrors _make_fp / _make_board in test_footprint.py
 # ---------------------------------------------------------------------------

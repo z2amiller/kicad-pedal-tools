@@ -34,7 +34,7 @@ import threading
 import time
 from typing import Any, Callable, List, Optional, Tuple
 
-from kicad_pedal_common.board_adapter import BoardAdapter, BBoxCenter, FootprintData
+from kicad_pedal_common.board_adapter import BBoxCenter, BoardAdapter, FootprintData
 
 logger = logging.getLogger(__name__)
 

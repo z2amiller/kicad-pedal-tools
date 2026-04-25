@@ -19,8 +19,8 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 from kicad_pedal_common.board_adapter import (
-    BoardAdapter,
     BBoxCenter,
+    BoardAdapter,
     FootprintData,
 )
 from kicad_pedal_common.drill import DrillHole, get_drill_holes_kiutils
