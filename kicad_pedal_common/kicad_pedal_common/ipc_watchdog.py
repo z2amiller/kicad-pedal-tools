@@ -44,6 +44,23 @@ def _kipy_transient_exceptions() -> tuple:
         return ()
 
 
+def _kipy_disconnect_exceptions() -> tuple:
+    """Return exception types that indicate KiCad has terminated (not transient).
+
+    ``kipy.errors.ConnectionError`` is the primary signal that the socket is
+    gone — it is NOT a subclass of Python's ``OSError`` or
+    ``ConnectionRefusedError``, so it must be caught explicitly.
+    """
+    try:
+        from kipy.errors import ConnectionError as KiPyConnectionError
+
+        if isinstance(KiPyConnectionError, type):
+            return (KiPyConnectionError,)
+    except (ImportError, AttributeError):
+        pass
+    return ()
+
+
 def wait_for_kicad(kicad: object, timeout_s: float = 8.0) -> bool:
     """Ping *kicad* repeatedly until it responds or *timeout_s* elapses.
 
@@ -96,17 +113,28 @@ def start_kicad_watchdog(
         The started :class:`threading.Thread`.
     """
 
+    # Build the fatal-disconnect exception tuple once, outside the loop.
+    # kipy.errors.ConnectionError is the primary signal; OSError subtypes
+    # (FileNotFoundError, ConnectionRefusedError) cover pynng-level failures
+    # where the OS error escapes before kipy wraps it.
+    fatal = _kipy_disconnect_exceptions() + (
+        ConnectionRefusedError,
+        FileNotFoundError,
+        OSError,
+    )
+
     def _watch() -> None:
         while True:
             time.sleep(poll_interval_s)
             try:
                 kicad.ping()  # type: ignore[union-attr]
-            except (ConnectionRefusedError, FileNotFoundError, OSError):
+            except fatal:
                 logger.info("KiCad IPC disconnected — calling on_exit")
                 on_exit()
                 return
             except Exception:
-                # Transient or concurrent error; keep watching.
+                # Transient or concurrent error (e.g. ApiError, TimeoutError
+                # while a board query is in flight); keep watching.
                 pass
 
     thread = threading.Thread(target=_watch, daemon=True, name=name or "kicad-watchdog")

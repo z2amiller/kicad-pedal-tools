@@ -86,19 +86,33 @@ class KiCadIPCManager:
     # Public API
     # ------------------------------------------------------------------
 
-    def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
+    def submit(
+        self,
+        fn: Callable,
+        *args: Any,
+        _retries: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Any:
         """Execute ``fn(*args, **kwargs)`` on the IPC thread and return the result.
 
-        Retries up to *max_retries* times on any exception, with
-        *retry_delay_s* between attempts.  Blocks the calling thread until
-        the call completes or *call_timeout_s* elapses.
+        Retries up to *max_retries* times (or *_retries* if given) on any
+        exception, with *retry_delay_s* between attempts.  Blocks the calling
+        thread until the call completes or *call_timeout_s* elapses.
+
+        Args:
+            fn: Callable to execute on the IPC worker thread.
+            *args: Positional arguments forwarded to *fn*.
+            _retries: Override the instance-level *max_retries* for this call
+                only.  Pass ``1`` to execute exactly once without retrying.
+            **kwargs: Keyword arguments forwarded to *fn*.
 
         Raises:
             TimeoutError: If the worker does not respond within the timeout.
             Exception: The last exception raised by *fn* after all retries.
         """
+        retries = _retries if _retries is not None else self._max_retries
         evt = threading.Event()
-        holder: List[Any] = [None, None]  # [result, exception]
+        holder: List[Any] = [None, None, retries]  # [result, exception, retries]
         self._queue.put((fn, args, kwargs, evt, holder))
         if not evt.wait(self._call_timeout):
             raise TimeoutError(
@@ -112,13 +126,16 @@ class KiCadIPCManager:
     def ping(self) -> None:
         """Ping KiCad — safe to call from any thread (routed through the queue).
 
+        Uses a single attempt (no retry) so that a dead socket is detected
+        quickly without the 400 ms × N retry delay.
+
         This is intentionally compatible with the *kicad* argument expected by
         :func:`~kicad_pedal_common.ipc_watchdog.start_kicad_watchdog`, so you
         can pass the manager directly as the first argument.
         """
         if self._ping_fn is None:
             return
-        self.submit(self._ping_fn)
+        self.submit(self._ping_fn, _retries=1)
 
     def shutdown(self) -> None:
         """Stop the worker thread.  Call this when the plugin is closing."""
@@ -136,21 +153,22 @@ class KiCadIPCManager:
                 return
 
             fn, args, kwargs, evt, holder = item
+            max_retries = holder[2]  # per-call override set by submit()
             last_exc: Optional[Exception] = None
 
-            for attempt in range(self._max_retries):
+            for attempt in range(max_retries):
                 try:
                     holder[0] = fn(*args, **kwargs)
                     last_exc = None
                     break
                 except Exception as exc:
                     last_exc = exc
-                    if attempt < self._max_retries - 1:
+                    if attempt < max_retries - 1:
                         logger.debug(
                             "IPC call %s failed (attempt %d/%d): %s — retrying",
                             getattr(fn, "__name__", repr(fn)),
                             attempt + 1,
-                            self._max_retries,
+                            max_retries,
                             exc,
                         )
                         time.sleep(self._retry_delay)
@@ -158,7 +176,7 @@ class KiCadIPCManager:
                         logger.warning(
                             "IPC call %s failed after %d attempts: %s",
                             getattr(fn, "__name__", repr(fn)),
-                            self._max_retries,
+                            max_retries,
                             exc,
                         )
 

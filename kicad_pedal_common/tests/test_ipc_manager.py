@@ -152,6 +152,42 @@ class TestKiCadIPCManager:
         mgr.ping()  # should not raise
         mgr.shutdown()
 
+    def test_ping_does_not_retry_on_failure(self):
+        """ping() must propagate immediately without retrying — a failed ping
+        means KiCad is dead, and retry delays slow disconnect detection."""
+        call_count = [0]
+
+        def _dead_ping():
+            call_count[0] += 1
+            raise ConnectionRefusedError("socket gone")
+
+        mgr = KiCadIPCManager(
+            ping_fn=_dead_ping,
+            max_retries=3,   # board ops retry 3×; ping must override to 1
+            retry_delay_s=1.0,  # if retry happened, test would be very slow
+        )
+        with pytest.raises(ConnectionRefusedError):
+            mgr.ping()
+
+        assert call_count[0] == 1, "ping() must not retry"
+        mgr.shutdown()
+
+    def test_submit_retries_override(self):
+        """_retries kwarg overrides instance max_retries for a single call."""
+        call_count = [0]
+
+        def _fail():
+            call_count[0] += 1
+            raise ValueError("nope")
+
+        mgr = KiCadIPCManager(
+            ping_fn=None, max_retries=5, retry_delay_s=0.0
+        )
+        with pytest.raises(ValueError):
+            mgr.submit(_fail, _retries=2)
+        assert call_count[0] == 2
+        mgr.shutdown()
+
     def test_shutdown_stops_worker(self):
         mgr = _make_manager()
         mgr.shutdown()

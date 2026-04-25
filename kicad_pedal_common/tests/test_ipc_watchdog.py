@@ -81,6 +81,41 @@ class TestStartKicadWatchdog:
         start_kicad_watchdog(kicad, on_exit=on_exit, poll_interval_s=0.01)
         assert on_exit_called.wait(timeout=2.0), "on_exit was not called within 2 s"
 
+    def test_calls_on_exit_for_kipy_connection_error(self):
+        """on_exit must be called when ping raises kipy.errors.ConnectionError.
+
+        kipy.errors.ConnectionError is NOT a subclass of OSError — it must be
+        caught explicitly or the watchdog silently ignores the disconnect.
+        """
+        # Create a fake KiPyConnectionError that is NOT an OSError subclass,
+        # mirroring the real kipy.errors.ConnectionError hierarchy.
+        class FakeKiPyConnectionError(Exception):
+            pass
+
+        kicad = MagicMock()
+        kicad.ping.side_effect = FakeKiPyConnectionError("kipy socket gone")
+        on_exit_called = threading.Event()
+
+        # Patch _kipy_disconnect_exceptions to return our fake class.
+        import kicad_pedal_common.ipc_watchdog as _wd
+        original = _wd._kipy_disconnect_exceptions
+
+        def _patched():
+            return (FakeKiPyConnectionError,)
+
+        _wd._kipy_disconnect_exceptions = _patched
+        try:
+            start_kicad_watchdog(
+                kicad,
+                on_exit=lambda: on_exit_called.set(),
+                poll_interval_s=0.01,
+            )
+            assert on_exit_called.wait(timeout=2.0), (
+                "on_exit was not called — kipy.errors.ConnectionError not in fatal list"
+            )
+        finally:
+            _wd._kipy_disconnect_exceptions = original
+
     def test_does_not_call_on_exit_for_transient_errors(self):
         """Generic exceptions (not disconnect errors) must not trigger on_exit."""
         kicad = MagicMock()
