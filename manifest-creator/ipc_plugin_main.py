@@ -35,8 +35,14 @@ def main() -> int:
 
     try:
         from kipy import KiCad
+        from kicad_pedal_common.ipc_watchdog import wait_for_kicad
 
         kicad = KiCad(socket_path=socket_path, kicad_token=token)
+
+        if not wait_for_kicad(kicad):
+            logger.error("Cannot connect to KiCad IPC at %s", socket_path)
+            return 1
+
         board = kicad.get_board()
         logger.info("Connected: board=%s", board.name)
     except Exception:
@@ -85,6 +91,8 @@ def _run(board, kicad) -> int:
     import threading
 
     import wx
+    from kicad_pedal_common.board_adapter import KipyBoardAdapter
+    from kicad_pedal_common.ipc_manager import KiCadIPCManager, SerializedBoardAdapter
     from kicad_pedal_common.plugin_utils import get_board_path
 
     board_path = get_board_path(board)
@@ -119,6 +127,13 @@ def _run(board, kicad) -> int:
     # kicad-cli path: prefer the one reported by the KiCad process.
     kicad_cli = getattr(kicad, "kicad_cli_path", None) or None
 
+    # All kipy calls go through a single worker thread — the pynng Req0 socket
+    # is not thread-safe.  Wrap the raw board before spawning _worker so the
+    # background thread never touches the socket directly.
+    manager = KiCadIPCManager(ping_fn=kicad.ping)
+    inner = KipyBoardAdapter(board)
+    adapter = SerializedBoardAdapter(inner, manager)
+
     from manifest_creator.log_dialog import LogDialog
     from manifest_creator.log_writer import LogWriter
     from manifest_creator.packager import create_manifest_zip
@@ -136,7 +151,8 @@ def _run(board, kicad) -> int:
                     writer(msg)
 
                 create_manifest_zip(
-                    board=board,
+                    board=None,
+                    adapter=adapter,
                     board_path=board_path,
                     output_path=output_path,
                     version="1.0.0",
@@ -156,6 +172,7 @@ def _run(board, kicad) -> int:
     log_dlg.ShowModal()   # runs wx event loop; CallAfter callbacks fire here
     log_dlg.Destroy()
 
+    manager.shutdown()
     return 0
 
 

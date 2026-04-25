@@ -134,10 +134,10 @@ def create_manifest_zip(
         )
 
         _log("Exporting BOM…")
-        # adapter kwarg is used by the standalone CLI (KiutilsBoardAdapter).
-        # The IPC plugin always passes board= and leaves adapter=None so that
-        # the existing export_bom(board) path — which uses kipy bounding boxes —
-        # is preserved unchanged.
+        # The IPC plugin passes adapter= (a SerializedBoardAdapter) so all kipy
+        # calls are serialized through the IPC manager thread.  The standalone
+        # CLI uses a KiutilsBoardAdapter.  board= is only used by callers that
+        # have not migrated to the adapter interface.
         if adapter is not None:
             components: List[Dict] = export_bom_from_adapter(adapter)
         elif board is not None:
