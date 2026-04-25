@@ -13,7 +13,7 @@ from panel_config import load_blurb
 
 
 class BuildDocDialog(wx.Dialog):
-    def __init__(self, parent, board):
+    def __init__(self, parent, board, adapter=None):
         _ver_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")
         _ver = open(_ver_file).read().strip() if os.path.exists(_ver_file) else "dev"
         self._use_webview = check_webview()
@@ -25,9 +25,11 @@ class BuildDocDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
         self.board = board
-        from kicad_pedal_common.board_adapter import KipyBoardAdapter
-
-        self.adapter = KipyBoardAdapter(board)
+        if adapter is not None:
+            self.adapter = adapter
+        else:
+            from kicad_pedal_common.board_adapter import KipyBoardAdapter
+            self.adapter = KipyBoardAdapter(board)
         self._preview_path: Optional[str] = None
         self._build_ui()
 

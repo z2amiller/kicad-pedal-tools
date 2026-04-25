@@ -11,8 +11,6 @@ import logging
 import os
 import sys
 import tempfile
-import threading
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -64,24 +62,6 @@ def _ensure_wx_app():
     return _WX_APP, True
 
 
-def _wait_for_kicad(kicad, timeout_s: float = 8.0) -> bool:
-    from kipy.errors import ApiError
-    from kipy.errors import ConnectionError as KiPyConnectionError
-
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            kicad.ping()
-            return True
-        except (ApiError, KiPyConnectionError, OSError):
-            time.sleep(0.2)
-    try:
-        kicad.ping()
-        return True
-    except Exception:
-        return False
-
-
 def main() -> int:
     logging.basicConfig(level=logging.INFO)
 
@@ -98,10 +78,11 @@ def main() -> int:
 
     try:
         from kipy import KiCad
+        from kicad_pedal_common.ipc_watchdog import wait_for_kicad
 
         kicad = KiCad(socket_path=socket_path, kicad_token=token)
 
-        if not _wait_for_kicad(kicad):
+        if not wait_for_kicad(kicad):
             logger.error("Cannot connect to KiCad IPC at %s", socket_path)
             return 1
 
@@ -109,7 +90,6 @@ def main() -> int:
         logger.info("Connected: board=%s", board.name)
 
         from cli_utils import set_kicad_cli_path
-
         set_kicad_cli_path(getattr(kicad, "kicad_cli_path", None))
     except Exception:
         logger.exception("Failed to connect to KiCad IPC")
@@ -130,25 +110,32 @@ def main() -> int:
         )
         return 0
 
+    manager = None
     try:
         import wx
 
         from build_doc_dialog import BuildDocDialog
+        from kicad_pedal_common.board_adapter import KipyBoardAdapter
+        from kicad_pedal_common.ipc_manager import KiCadIPCManager, SerializedBoardAdapter
+        from kicad_pedal_common.ipc_watchdog import start_kicad_watchdog
 
-        dlg = BuildDocDialog(None, board)
+        # All kipy calls go through a single worker thread — the pynng Req0
+        # socket is not thread-safe and KiCad serializes requests on its UI
+        # thread anyway, so there is no benefit to concurrent access.
+        manager = KiCadIPCManager(ping_fn=kicad.ping)
+        inner = KipyBoardAdapter(board)
+        adapter = SerializedBoardAdapter(inner, manager)
 
-        def _watch_kicad():
-            while True:
-                time.sleep(3)
-                try:
-                    kicad.ping()
-                except (ConnectionRefusedError, FileNotFoundError, OSError):
-                    wx.CallAfter(dlg.EndModal, wx.ID_CANCEL)
-                    return
-                except Exception:
-                    pass  # transient/concurrent error; keep watching
+        dlg = BuildDocDialog(None, board, adapter=adapter)
 
-        threading.Thread(target=_watch_kicad, daemon=True).start()
+        # Watchdog calls manager.ping() which goes through the queue,
+        # keeping all IPC traffic on the worker thread.
+        start_kicad_watchdog(
+            manager,
+            on_exit=lambda: wx.CallAfter(dlg.EndModal, wx.ID_CANCEL),
+            name="builddoc-watchdog",
+        )
+
         dlg.ShowModal()
         dlg.Destroy()
     except Exception:
@@ -156,6 +143,8 @@ def main() -> int:
         return 1
     finally:
         _release_instance_lock()
+        if manager is not None:
+            manager.shutdown()
 
     if created_app:
         app.MainLoop()
