@@ -14,6 +14,7 @@ class TestExportAllLayers:
         with (
             patch("manifest_creator.svg_export.find_kicad_cli", return_value="/usr/bin/kicad-cli"),
             patch("manifest_creator.svg_export.export_layer_svg") as mock_export,
+            patch("manifest_creator.svg_export.export_drill_map_svg", return_value={}),
         ):
             export_all_layers(
                 board_path="/fake/board.kicad_pcb",
@@ -32,6 +33,7 @@ class TestExportAllLayers:
         with (
             patch("manifest_creator.svg_export.find_kicad_cli", return_value="/usr/bin/kicad-cli"),
             patch("manifest_creator.svg_export.export_layer_svg"),
+            patch("manifest_creator.svg_export.export_drill_map_svg", return_value={}),
         ):
             result = export_all_layers(
                 board_path="/fake/board.kicad_pcb",
@@ -54,6 +56,7 @@ class TestExportAllLayers:
         with (
             patch("manifest_creator.svg_export.find_kicad_cli") as mock_find,
             patch("manifest_creator.svg_export.export_layer_svg"),
+            patch("manifest_creator.svg_export.export_drill_map_svg", return_value={}),
         ):
             export_all_layers(
                 board_path="/fake/board.kicad_pcb",
@@ -68,6 +71,7 @@ class TestExportAllLayers:
         with (
             patch("manifest_creator.svg_export.find_kicad_cli", return_value="/usr/bin/kicad-cli"),
             patch("manifest_creator.svg_export.export_layer_svg") as mock_export,
+            patch("manifest_creator.svg_export.export_drill_map_svg", return_value={}),
         ):
             result = export_all_layers(
                 board_path="/fake/board.kicad_pcb",
@@ -82,6 +86,7 @@ class TestExportAllLayers:
         with (
             patch("manifest_creator.svg_export.find_kicad_cli", return_value="/usr/bin/kicad-cli"),
             patch("manifest_creator.svg_export.export_layer_svg"),
+            patch("manifest_creator.svg_export.export_drill_map_svg", return_value={}),
         ):
             export_all_layers(
                 board_path="/fake/board.kicad_pcb",

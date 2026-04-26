@@ -14,14 +14,16 @@ from typing import Callable, Dict, List, Optional
 
 import jsonschema
 import jsonschema.exceptions
+
+# Schema files live inside the kicad_pedal_common package, not adjacent to this file.
+import kicad_pedal_common as _kpc
 from referencing import Registry, Resource
 
 from manifest_creator.bom_export import export_bom, export_bom_from_adapter
 from manifest_creator.footprint_svg_export import export_footprint_svgs
 from manifest_creator.svg_export import export_all_layers
 
-# Path to the vendored schema files (relative to this file's package root)
-_SCHEMA_DIR = pathlib.Path(__file__).parent.parent / "kicad_pedal_common" / "schema"
+_SCHEMA_DIR = pathlib.Path(_kpc.__file__).parent / "schema"
 
 
 def _load_schema(name: str) -> Dict:
